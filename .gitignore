@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# Xcode personal settings (breakpoints, schemes state, UI layout)
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+*.xccheckout
+
+# Build output
+build/
+DerivedData/
+
+# Swift Package Manager
+.build/
+.swiftpm/
