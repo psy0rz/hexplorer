@@ -7,6 +7,8 @@ overlay on a satellite map. You can also put custom flags on the map.
 All data stays on the device, in a local SQLite database. You can export and import the database
 from the app.
 
+Download Hexplorer from the [App Store](https://apps.apple.com/app/id6761833997).
+
 
 ## Tracking mode
 
