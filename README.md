@@ -7,6 +7,16 @@ overlay on a satellite map. You can also put custom flags on the map.
 All data stays on the device, in a local SQLite database. You can export and import the database
 from the app.
 
+
+## Tracking mode
+
+<img width="300"  alt="D13303ED-4D22-4E9A-8908-3B1D7A4E24CE_1_105_c" src="https://github.com/user-attachments/assets/2a3e62c3-be08-42f1-8e6d-bbb5900bc235" />
+
+## Flag editor
+
+<img width="300" alt="1D714B76-B132-427A-88E4-671710A538C4_1_105_c" src="https://github.com/user-attachments/assets/9e20a722-68b6-48be-817d-01333c6e502a" />
+
+
 ## Requirements
 
 - Xcode 26 or later
