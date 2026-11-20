@@ -48,6 +48,9 @@ struct ContentView: View {
             .edgesIgnoringSafeArea(.all)
 
             if let mapView {
+                VisitedHexagonsView(mapView: mapView)
+                    .edgesIgnoringSafeArea(.all)
+
                 HexagonHighlightView(mapView: mapView)
                     .edgesIgnoringSafeArea(.all)
             }

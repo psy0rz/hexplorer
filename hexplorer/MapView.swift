@@ -126,7 +126,6 @@ struct MapView: UIViewRepresentable {
         mapView.mapType = .satellite
         mapView.showsUserLocation = true
         mapView.userTrackingMode = .follow
-        mapView.addOverlay(HexagonOverlay())
         mapView.register(FlagAnnotationView.self, forAnnotationViewWithReuseIdentifier: FlagAnnotationView.reuseID)
 //        mapView.register(FlagClusterAnnotationView.self, forAnnotationViewWithReuseIdentifier: FlagClusterAnnotationView.reuseID)
 
@@ -165,13 +164,6 @@ extension MapView {
 
         /// Called when the user taps a flag annotation directly.
         var onFlagEdit: ((MapFlag) -> Void)?
-
-        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            if overlay is HexagonOverlay {
-                return HexagonOverlayRenderer(overlay: overlay)
-            }
-            return MKOverlayRenderer(overlay: overlay)
-        }
 
         func mapView(_ mapView: MKMapView, didChange mode: MKUserTrackingMode, animated: Bool) {
             if mode == .followWithHeading {
@@ -254,10 +246,7 @@ extension Notification.Name {
 // MARK: - Shared helpers
 
 func refreshHexagonOverlay(on mapView: MKMapView) {
-    if let overlay = mapView.overlays.first(where: { $0 is HexagonOverlay }),
-       let renderer = mapView.renderer(for: overlay) {
-        renderer.setNeedsDisplay()
-    }
+    VisitedHexagonsState.shared.reloadHexagons(on: mapView)
 }
 
 /// Full sync: removes stale annotations and adds missing ones.
