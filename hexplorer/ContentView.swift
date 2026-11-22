@@ -55,6 +55,7 @@ struct ContentView: View {
             VStack {
                 Spacer()
                 HStack(spacing: 16) {
+                    ////tracking button
                     Button(action: toggleTracking) {
                         HStack {
                             Image(systemName: tracker.isTracking ? "location.fill" : "location")
@@ -66,14 +67,16 @@ struct ContentView: View {
                         .foregroundStyle(.white)
                         .clipShape(Capsule())
                     }
+                    ////filter options
                     Button(action: { activePanel = activePanel == .filterOptions ? nil : .filterOptions }) {
                         Image(systemName: "slider.horizontal.3")
                             .font(.headline)
                             .padding()
-                            .background(activePanel == .filterOptions ? Color.blue : .secondary.opacity(0.8))
+                            .background(.secondary.opacity(0.8))
                             .foregroundStyle(.white)
                             .clipShape(Capsule())
                     }
+                    ////menu
                     Menu {
                         Button(action: exportDatabase) {
                             Label("Export Database", systemImage: "square.and.arrow.up")
