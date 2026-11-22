@@ -150,10 +150,6 @@ final class VisitedHexagonOverlays {
 
         let candidateCells = Self.hexagons(in: MKCoordinateRegion(paddedMapRect), resolution: resolution)
         let visitedByID = CellStore.shared.visitedCells(among: Set(candidateCells.map { $0.id }))
-        // Coverage needs an extra database query, so calculate it only in coverage mode.
-        let coverageByCellID = FilterState.shared.mode == .coverage
-            ? Self.coverageByCellID(of: candidateCells.filter { visitedByID[$0.id] != nil }, resolution: resolution)
-            : [:]
 
         // The polygons go to MapKit; the cell IDs let `updateOverlays` find the changed layers.
         var polygonsByLayer: [OverlayLayer: [MKPolygon]] = [:]
@@ -164,7 +160,7 @@ final class VisitedHexagonOverlays {
                   !boundary.isEmpty else { continue }
 
             let polygon = MKPolygon(points: boundary, count: boundary.count)
-            let densityLayer: OverlayLayer = switch Self.classifyCell(info: info, coverage: coverageByCellID[cell.id] ?? 0) {
+            let densityLayer: OverlayLayer = switch Self.classifyCell(info: info, resolution: resolution) {
             case .partial: .partial
             case .dense:   .dense
             case .full:    .full
@@ -236,8 +232,7 @@ final class VisitedHexagonOverlays {
     }
 
     /// Gives a visited cell its density, from the filter mode and the slider positions in `FilterState`.
-    /// `coverage` is used only in coverage mode.
-    private static func classifyCell(info: VisitedCell, coverage: Double) -> CellDensity {
+    private static func classifyCell(info: VisitedCell, resolution: H3Cell.Resolution) -> CellDensity {
         let filter = FilterState.shared
         switch filter.mode {
         case .time:
@@ -254,7 +249,7 @@ final class VisitedHexagonOverlays {
             )
         case .coverage:
             return density(
-                forAmount: coverage,
+                forAmount: explorationScore(visitedLeaves: info.visitedLeaves, resolution: resolution),
                 denseMinimum: FilterState.coverageStops[filter.denseCoverageStopIndex].value,
                 fullMinimum: FilterState.coverageStops[filter.fullCoverageStopIndex].value
             )
@@ -274,41 +269,26 @@ final class VisitedHexagonOverlays {
         return .partial
     }
 
-    /// For amounts such as coverage or visit count: more is denser.
+    /// For amounts such as the exploration score or the visit count: more is denser.
     private static func density(forAmount amount: Double, denseMinimum: Double, fullMinimum: Double) -> CellDensity {
         if amount >= fullMinimum { return .full }
         if amount >= denseMinimum { return .dense }
         return .partial
     }
 
-    /// The coverage of each cell: the fraction of its descendants two resolutions finer that are
-    /// visited (one resolution finer just above the leaf resolution). A leaf cell has coverage 1.
-    /// Two levels down gives 49 descendants: fine enough to show partial coverage, and the same
-    /// meaning at every zoom level.
-    private static func coverageByCellID(of visitedCells: [H3Cell], resolution: H3Cell.Resolution) -> [UInt64: Double] {
-        let descendantResolutionValue = min(Int(resolution.rawValue) + 2, CellStore.maxResolution)
-        guard descendantResolutionValue > Int(resolution.rawValue),
-              let descendantResolution = H3Cell.Resolution(rawValue: Int32(descendantResolutionValue))
-        else { return Dictionary(uniqueKeysWithValues: visitedCells.map { ($0.id, 1.0) }) }
-
-        var descendantIDsByCellID: [UInt64: [UInt64]] = [:]
-        for cell in visitedCells {
-            descendantIDsByCellID[cell.id] = (try? cell.children(at: descendantResolution).map(\.id)) ?? []
-        }
-
-        // Query in chunks, to stay below the SQLite limit for the number of query parameters.
-        let allDescendantIDs = descendantIDsByCellID.values.flatMap { $0 }
-        var visitedDescendantIDs = Set<UInt64>()
-        for chunkStart in stride(from: 0, to: allDescendantIDs.count, by: 10_000) {
-            let chunk = allDescendantIDs[chunkStart..<min(chunkStart + 10_000, allDescendantIDs.count)]
-            visitedDescendantIDs.formUnion(CellStore.shared.visitedCells(among: Set(chunk)).keys)
-        }
-
-        return descendantIDsByCellID.mapValues { descendantIDs in
-            guard !descendantIDs.isEmpty else { return 0 }
-            let visitedCount = descendantIDs.filter { visitedDescendantIDs.contains($0) }.count
-            return Double(visitedCount) / Double(descendantIDs.count)
-        }
+    /// The exploration score of a cell, from 0 to 1: `log(visitedLeaves) / log(leafCount)`, where
+    /// leafCount is the number of leaf cells in the cell (7 per resolution step).
+    ///
+    /// A route is a line and full coverage is a surface. One straight walk through a cell visits
+    /// about √leafCount leaves, so it scores 0.5 at every resolution; a network of routes scores
+    /// about 0.75, and a fully visited cell 1. A single visited point scores 0, and a visited
+    /// leaf cell scores 1.
+    private static func explorationScore(visitedLeaves: Int, resolution: H3Cell.Resolution) -> Double {
+        let resolutionStepsToLeaves = CellStore.maxResolution - Int(resolution.rawValue)
+        guard resolutionStepsToLeaves > 0 else { return 1 }
+        guard visitedLeaves > 1 else { return 0 }
+        let logLeafCount = Double(resolutionStepsToLeaves) * log(7.0)
+        return min(log(Double(visitedLeaves)) / logLeafCount, 1)
     }
 
     /// Returns H3 cells within the region at the given resolution.

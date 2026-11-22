@@ -4,7 +4,8 @@ import Foundation
 enum FilterMode: String, CaseIterable, Identifiable {
     /// How recently the cell was visited (`lastVisitedAt`).
     case time       = "Time"
-    /// How much of the cell is explored: the visited part of its cells two levels finer.
+    /// How well the cell is explored: the exploration score from its visited leaf cells
+    /// (0.5 ≈ one route through the cell, 1 = fully visited), the same at every zoom level.
     case coverage   = "Coverage"
     /// How often the cell was visited (`visitCount`).
     case visits     = "Visits"
@@ -27,9 +28,9 @@ final class FilterState {
     var veryRecentAgeStopIndex = FilterState.stopIndex(label: "1 d", in: FilterState.ageStops)
     var recentAgeStopIndex = FilterState.stopIndex(label: "1 wk", in: FilterState.ageStops)
 
-    // Coverage: at least `full` → full, at least `dense` → dense, less → partial.
-    var denseCoverageStopIndex = FilterState.stopIndex(label: "10%", in: FilterState.coverageStops)
-    var fullCoverageStopIndex = FilterState.stopIndex(label: "50%", in: FilterState.coverageStops)
+    // Coverage: an exploration score of at least `full` → full, at least `dense` → dense, less → partial.
+    var denseCoverageStopIndex = FilterState.stopIndex(label: "0.50", in: FilterState.coverageStops)
+    var fullCoverageStopIndex = FilterState.stopIndex(label: "0.70", in: FilterState.coverageStops)
 
     // Visits: at least `full` visits → full, at least `dense` visits → dense, fewer → partial.
     var denseVisitCountStopIndex = FilterState.stopIndex(label: "2", in: FilterState.visitCountStops)
@@ -82,9 +83,9 @@ final class FilterState {
         ]
     }()
 
-    /// Coverage as a fraction: fine steps for low coverage, where most cells are.
-    static let coverageStops: [FilterStop] = [0.02, 0.05, 0.10, 0.15, 0.20, 0.30, 0.40, 0.50, 0.65, 0.80, 0.90, 1.00]
-        .map { FilterStop(value: $0, label: "\(Int(($0 * 100).rounded()))%") }
+    /// Exploration scores: fine steps from 0.5 (one route through the cell) to 0.8, where most cells are.
+    static let coverageStops: [FilterStop] = [0.10, 0.20, 0.30, 0.40, 0.50, 0.55, 0.60, 0.65, 0.70, 0.75, 0.80, 0.90, 1.00]
+        .map { FilterStop(value: $0, label: String(format: "%.2f", $0)) }
 
     /// Visit counts: fine steps for few visits, coarse steps for many.
     static let visitCountStops: [FilterStop] = [1, 2, 3, 4, 5, 7, 10, 15, 20, 30, 50, 100]
