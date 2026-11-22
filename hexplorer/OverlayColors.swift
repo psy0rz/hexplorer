@@ -5,7 +5,8 @@ import SwiftUI
 final class OverlayColors {
     static let shared = OverlayColors()
 
-    var partial      = Color(red: 1, green: 1, blue: 1.0).opacity(1)
+//    var partial      = Color(red: 0.8, green: 0.8, blue: 0.8).opacity(1)
+    var partial      = Color(red: 1, green: 1, blue: 1).opacity(1)
     var partialWidth = 1.0
 //    var partialFill  = Color.white.opacity(0.0)
 
@@ -19,7 +20,8 @@ final class OverlayColors {
 
     /// Dark line below the outlines of all visited cells, so they stay visible on light backgrounds.
     /// It is wider than the outlines; the difference is split over both sides.
-    var halo         = Color.black.opacity(0.5)
+//    var halo      = Color(red: 0.2, green: 0.2, blue: 0.2).opacity(1)
+    var halo         = Color.black.opacity(1)
     var haloWidth    = 2.0
 
     private init() {}

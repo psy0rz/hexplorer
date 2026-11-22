@@ -31,29 +31,61 @@ func h3Resolution(for zoomScale: MKZoomScale, latitude: Double) -> H3Cell.Resolu
 
 // MARK: - Overlays
 
-enum CellDensity { case partial, dense, full }
+/// How much a visited cell is "explored". `classifyCell` decides the density from the
+/// active filter mode (children, time or leaves). Each density has its own overlay layer
+/// and its own colors in `OverlayColors`.
+enum CellDensity {
+    /// Visited a little: only an outline, no fill.
+    case partial
+    /// Visited more: outline and a light fill.
+    case dense
+    /// Visited the most: outline and the strongest fill.
+    case full
+}
 
 /// Shows the visited cells as native MapKit overlays: one overlay for each density, with its
 /// own fill and stroke, on top of one dark halo overlay for all cells. The halo keeps the
 /// light outlines visible on light map backgrounds. MapKit draws the overlays and moves them
-/// with the map; this class only replaces them when the loaded cells change.
+/// with the map; this class only replaces the overlays whose cells changed.
 @Observable
 final class VisitedHexagonOverlays {
     static let shared = VisitedHexagonOverlays()
+
+    /// The overlay layers. The order of the cases is the drawing order on the map,
+    /// from bottom to top; `insert(_:for:replacing:on:)` depends on it.
+    ///
+    /// Each visited cell is in two layers: the halo layer, and the layer of its density.
+    /// Two adjacent cells share an edge. When they have different densities, both layers
+    /// draw that edge, and the line of the higher (denser) layer is on top.
+    private enum OverlayLayer: CaseIterable {
+        /// All visited cells, as a wide dark line below all other layers. It shows as a thin
+        /// dark edge on each side of the light outlines, so they stay visible on light backgrounds.
+        case halo
+        /// The partial cells: outline only.
+        case partial
+        /// The dense cells: fill and outline.
+        case dense
+        /// The full cells: fill and outline, on top of everything.
+        case full
+    }
+
+    /// The overlay of one layer that is on the map now, and the cells it shows.
+    /// A reload compares the cells, and replaces the overlay only if they changed.
+    private struct LayerContent {
+        let overlay: MKMultiPolygon
+        let cellIDs: Set<UInt64>
+    }
 
     // The cells are loaded for an area larger than the viewport, so that a pan
     // does not query H3 and the database again.
     @ObservationIgnored private var loadedMapRect = MKMapRect.null
     @ObservationIgnored private var loadedResolution: H3Cell.Resolution?
 
-    @ObservationIgnored private var haloOverlay: MKMultiPolygon?
-    @ObservationIgnored private var partialOverlay: MKMultiPolygon?
-    @ObservationIgnored private var denseOverlay: MKMultiPolygon?
-    @ObservationIgnored private var fullOverlay: MKMultiPolygon?
+    @ObservationIgnored private var contentByLayer: [OverlayLayer: LayerContent] = [:]
 
     private init() {}
 
-    /// Loads the cells and replaces the overlays if the viewport left the loaded area
+    /// Loads the cells and updates the overlays if the viewport left the loaded area
     /// or the resolution changed. Otherwise it does nothing.
     func mapViewportDidChange(_ mapView: MKMapView) {
         let visibleMapRect = mapView.visibleMapRect
@@ -75,32 +107,39 @@ final class VisitedHexagonOverlays {
 
     /// Returns the renderer for one of the overlays of this class, or `nil` for other overlays.
     func renderer(for overlay: any MKOverlay) -> MKOverlayRenderer? {
-        guard let multiPolygon = overlay as? MKMultiPolygon else { return nil }
+        guard let multiPolygon = overlay as? MKMultiPolygon,
+              let layer = OverlayLayer.allCases.first(where: { contentByLayer[$0]?.overlay === multiPolygon })
+        else { return nil }
+
         let colors = OverlayColors.shared
         let renderer = MKMultiPolygonRenderer(multiPolygon: multiPolygon)
-
-        if multiPolygon === haloOverlay {
+        switch layer {
+        case .halo:
             renderer.strokeColor = UIColor(colors.halo)
             renderer.lineWidth = colors.haloWidth
-        } else if multiPolygon === partialOverlay {
+        case .partial:
             renderer.strokeColor = UIColor(colors.partial)
             renderer.lineWidth = colors.partialWidth
-        } else if multiPolygon === denseOverlay {
+        case .dense:
             renderer.fillColor = UIColor(colors.denseFill)
             renderer.strokeColor = UIColor(colors.dense)
             renderer.lineWidth = colors.denseWidth
-        } else if multiPolygon === fullOverlay {
+        case .full:
             renderer.fillColor = UIColor(colors.fullFill)
             renderer.strokeColor = UIColor(colors.full)
             renderer.lineWidth = colors.fullWidth
-        } else {
-            return nil
         }
         return renderer
     }
 
     // MARK: - Private
 
+    /// Loads the visited cells near the viewport and puts them on the map, in these steps:
+    /// 1. Find all H3 cells of the resolution in the viewport plus padding.
+    /// 2. Get the cells of those that are visited from the database.
+    /// 3. Give each visited cell a density, and put its polygon into the halo layer and
+    ///    into the layer of its density (see `OverlayLayer`).
+    /// 4. Replace the overlays of the layers whose cells changed.
     private func loadHexagons(around visibleMapRect: MKMapRect, resolution: H3Cell.Resolution, on mapView: MKMapView) {
         let loadStartTime = ContinuousClock.now
 
@@ -111,48 +150,93 @@ final class VisitedHexagonOverlays {
 
         let candidateCells = Self.hexagons(in: MKCoordinateRegion(paddedMapRect), resolution: resolution)
         let visitedByID = CellStore.shared.visitedCells(among: Set(candidateCells.map { $0.id }))
+        // The leaf-count filter compares each cell with the most visited cell in this area.
         let maxLeaves = visitedByID.values.map(\.visitedLeaves).max() ?? 1
 
-        var partialPolygons: [MKPolygon] = []
-        var densePolygons: [MKPolygon] = []
-        var fullPolygons: [MKPolygon] = []
+        // The polygons go to MapKit; the cell IDs let `updateOverlays` find the changed layers.
+        var polygonsByLayer: [OverlayLayer: [MKPolygon]] = [:]
+        var cellIDsByLayer: [OverlayLayer: Set<UInt64>] = [:]
         for cell in candidateCells {
             guard let info = visitedByID[cell.id],
                   let boundary = try? cell.boundary.map({ MKMapPoint($0.coordinates) }),
                   !boundary.isEmpty else { continue }
 
             let polygon = MKPolygon(points: boundary, count: boundary.count)
-            switch Self.classifyCell(info: info, resolution: Int(resolution.rawValue), maxLeaves: maxLeaves) {
-            case .partial: partialPolygons.append(polygon)
-            case .dense:   densePolygons.append(polygon)
-            case .full:    fullPolygons.append(polygon)
+            let densityLayer: OverlayLayer = switch Self.classifyCell(info: info, resolution: Int(resolution.rawValue), maxLeaves: maxLeaves) {
+            case .partial: .partial
+            case .dense:   .dense
+            case .full:    .full
+            }
+            // The same polygon goes into the halo layer and into its density layer.
+            for layer in [OverlayLayer.halo, densityLayer] {
+                polygonsByLayer[layer, default: []].append(polygon)
+                cellIDsByLayer[layer, default: []].insert(cell.id)
             }
         }
 
-        replaceOverlays(partialPolygons: partialPolygons, densePolygons: densePolygons, fullPolygons: fullPolygons, on: mapView)
+        let changedLayers = updateOverlays(polygonsByLayer: polygonsByLayer, cellIDsByLayer: cellIDsByLayer, on: mapView)
         loadedMapRect = paddedMapRect
         loadedResolution = resolution
 
-        print("loadHexagons: res=\(resolution.rawValue), candidates=\(candidateCells.count), partial=\(partialPolygons.count), dense=\(densePolygons.count), full=\(fullPolygons.count), took \(loadStartTime.duration(to: .now))")
+        let cellCounts = OverlayLayer.allCases.map { "\($0)=\(cellIDsByLayer[$0]?.count ?? 0)" }.joined(separator: ", ")
+        print("loadHexagons: res=\(resolution.rawValue), candidates=\(candidateCells.count), \(cellCounts), changed=[\(changedLayers.map { "\($0)" }.joined(separator: ", "))], took \(loadStartTime.duration(to: .now))")
     }
 
-    /// Adds the new overlays before it removes the old ones, so the map does not flicker.
-    private func replaceOverlays(partialPolygons: [MKPolygon], densePolygons: [MKPolygon], fullPolygons: [MKPolygon], on mapView: MKMapView) {
-        let oldOverlays = [haloOverlay, partialOverlay, denseOverlay, fullOverlay].compactMap { $0 }
-        let allPolygons = partialPolygons + densePolygons + fullPolygons
+    /// Replaces only the layers whose cells changed, and returns them. A new overlay goes directly
+    /// above the overlay it replaces, so the drawing order stays the same, and the old overlay
+    /// is removed after that, so the map does not flicker.
+    private func updateOverlays(
+        polygonsByLayer: [OverlayLayer: [MKPolygon]],
+        cellIDsByLayer: [OverlayLayer: Set<UInt64>],
+        on mapView: MKMapView
+    ) -> [OverlayLayer] {
+        var changedLayers: [OverlayLayer] = []
 
-        haloOverlay = allPolygons.isEmpty ? nil : MKMultiPolygon(allPolygons)
-        partialOverlay = partialPolygons.isEmpty ? nil : MKMultiPolygon(partialPolygons)
-        denseOverlay = densePolygons.isEmpty ? nil : MKMultiPolygon(densePolygons)
-        fullOverlay = fullPolygons.isEmpty ? nil : MKMultiPolygon(fullPolygons)
+        for layer in OverlayLayer.allCases {
+            let newCellIDs = cellIDsByLayer[layer] ?? []
+            let oldContent = contentByLayer[layer]
+            guard newCellIDs != (oldContent?.cellIDs ?? []) else { continue }
+            changedLayers.append(layer)
 
-        // The order sets the drawing order: the halo below everything, and
-        // on a shared edge the denser cell on top.
-        let newOverlays = [haloOverlay, partialOverlay, denseOverlay, fullOverlay].compactMap { $0 }
-        mapView.addOverlays(newOverlays, level: .aboveLabels)
-        mapView.removeOverlays(oldOverlays)
+            if let polygons = polygonsByLayer[layer], !polygons.isEmpty {
+                let newOverlay = MKMultiPolygon(polygons)
+                // Set the content first: MapKit asks for the renderer while the overlay is inserted.
+                contentByLayer[layer] = LayerContent(overlay: newOverlay, cellIDs: newCellIDs)
+                insert(newOverlay, for: layer, replacing: oldContent?.overlay, on: mapView)
+            } else {
+                contentByLayer[layer] = nil
+            }
+            if let oldOverlay = oldContent?.overlay {
+                mapView.removeOverlay(oldOverlay)
+            }
+        }
+        return changedLayers
     }
 
+    /// Inserts the overlay at the position of its layer: above the overlay it replaces, else above
+    /// the nearest lower layer, else below the nearest higher layer.
+    private func insert(_ overlay: MKMultiPolygon, for layer: OverlayLayer, replacing oldOverlay: MKMultiPolygon?, on mapView: MKMapView) {
+        if let oldOverlay {
+            mapView.insertOverlay(overlay, above: oldOverlay)
+            return
+        }
+
+        let layers = OverlayLayer.allCases
+        guard let layerIndex = layers.firstIndex(of: layer) else { return }
+
+        if let lowerOverlay = layers[..<layerIndex].reversed().lazy.compactMap({ self.contentByLayer[$0]?.overlay }).first {
+            mapView.insertOverlay(overlay, above: lowerOverlay)
+        } else if let higherOverlay = layers[(layerIndex + 1)...].lazy.compactMap({ self.contentByLayer[$0]?.overlay }).first {
+            mapView.insertOverlay(overlay, below: higherOverlay)
+        } else {
+            mapView.addOverlay(overlay, level: .aboveLabels)
+        }
+    }
+
+    /// Gives a visited cell its density, from the filter mode and the thresholds in `FilterState`:
+    /// - resolution: the number of visited child cells (a leaf cell is always full),
+    /// - time: how recently the cell was visited,
+    /// - leafCount: the visited leaf cells, as a percentage of the most in the loaded area.
     private static func classifyCell(info: VisitedCell, resolution: Int, maxLeaves: Int) -> CellDensity {
         let filter = FilterState.shared
         switch filter.mode {
