@@ -33,49 +33,51 @@ struct FilterOptionsPanel: View {
         .padding(.bottom, 16)
     }
 
+    /// One slider for each mode. The two thumbs are the borders between partial, dense and full.
+    /// For ages a lower value is denser, so the segments run full → partial; for amounts
+    /// a higher value is denser, so they run partial → full.
     @ViewBuilder
     private var modeControls: some View {
         switch filter.mode {
-        case .resolution:
-            sliderRow(label: "Dense from", value: $filter.denseChildrenThreshold, range: 1...7, unit: "children")
-            sliderRow(label: "Full from",  value: $filter.fullChildrenThreshold,  range: 1...7, unit: "children")
         case .time:
-            timeSlider
-        case .leafCount:
-            sliderRow(label: "Dense from", value: $filter.denseLeafPercent, range: 1...99,  unit: "%")
-            sliderRow(label: "Full from",  value: $filter.fullLeafPercent,  range: 1...100, unit: "%")
+            stopSlider(stops: FilterState.ageStops,
+                       lowerStopIndex: $filter.veryRecentAgeStopIndex,
+                       upperStopIndex: $filter.recentAgeStopIndex,
+                       lowerValueIsDenser: true)
+        case .coverage:
+            stopSlider(stops: FilterState.coverageStops,
+                       lowerStopIndex: $filter.denseCoverageStopIndex,
+                       upperStopIndex: $filter.fullCoverageStopIndex,
+                       lowerValueIsDenser: false)
+        case .visits:
+            stopSlider(stops: FilterState.visitCountStops,
+                       lowerStopIndex: $filter.denseVisitCountStopIndex,
+                       upperStopIndex: $filter.fullVisitCountStopIndex,
+                       lowerValueIsDenser: false)
+        case .discovered:
+            stopSlider(stops: FilterState.ageStops,
+                       lowerStopIndex: $filter.newlyDiscoveredAgeStopIndex,
+                       upperStopIndex: $filter.recentlyDiscoveredAgeStopIndex,
+                       lowerValueIsDenser: true)
         }
     }
 
-    /// One track for the three time levels: full (visited very recently), dense (recently)
-    /// and partial (longer ago). The two thumbs are the borders between the levels.
-    private var timeSlider: some View {
-        let ageStops = FilterState.ageStops
+    private func stopSlider(
+        stops: [FilterState.FilterStop],
+        lowerStopIndex: Binding<Int>,
+        upperStopIndex: Binding<Int>,
+        lowerValueIsDenser: Bool
+    ) -> some View {
         let colors = OverlayColors.shared
-
+        let partialSegmentColor = Color.secondary.opacity(0.3)
         return TwoThumbStopSlider(
-            lowerStopIndex: $filter.veryRecentAgeStopIndex,
-            upperStopIndex: $filter.recentAgeStopIndex,
-            stopCount: ageStops.count,
-            stopLabel: { ageStops[$0].label },
-            lowerSegmentColor: colors.full,
+            lowerStopIndex: lowerStopIndex,
+            upperStopIndex: upperStopIndex,
+            stopCount: stops.count,
+            stopLabel: { stops[$0].label },
+            lowerSegmentColor: lowerValueIsDenser ? colors.full : partialSegmentColor,
             middleSegmentColor: colors.dense,
-            upperSegmentColor: .secondary.opacity(0.3)
+            upperSegmentColor: lowerValueIsDenser ? partialSegmentColor : colors.full
         )
-    }
-
-    @ViewBuilder
-    private func sliderRow(label: String, value: Binding<Double>, range: ClosedRange<Double>, unit: String) -> some View {
-        VStack(spacing: 2) {
-            HStack {
-                Text(label)
-                    .font(.caption)
-                Spacer()
-                Text("\(Int(value.wrappedValue)) \(unit)")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-            Slider(value: value, in: range, step: 1)
-        }
     }
 }

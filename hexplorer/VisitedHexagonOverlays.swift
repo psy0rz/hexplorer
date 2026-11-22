@@ -32,7 +32,7 @@ func h3Resolution(for zoomScale: MKZoomScale, latitude: Double) -> H3Cell.Resolu
 // MARK: - Overlays
 
 /// How much a visited cell is "explored". `classifyCell` decides the density from the
-/// active filter mode (children, time or leaves). Each density has its own overlay layer
+/// active filter mode (time, coverage, visits or discovered). Each density has its own overlay layer
 /// and its own colors in `OverlayColors`.
 enum CellDensity {
     /// Visited a little: only an outline, no fill.
@@ -150,8 +150,10 @@ final class VisitedHexagonOverlays {
 
         let candidateCells = Self.hexagons(in: MKCoordinateRegion(paddedMapRect), resolution: resolution)
         let visitedByID = CellStore.shared.visitedCells(among: Set(candidateCells.map { $0.id }))
-        // The leaf-count filter compares each cell with the most visited cell in this area.
-        let maxLeaves = visitedByID.values.map(\.visitedLeaves).max() ?? 1
+        // Coverage needs an extra database query, so calculate it only in coverage mode.
+        let coverageByCellID = FilterState.shared.mode == .coverage
+            ? Self.coverageByCellID(of: candidateCells.filter { visitedByID[$0.id] != nil }, resolution: resolution)
+            : [:]
 
         // The polygons go to MapKit; the cell IDs let `updateOverlays` find the changed layers.
         var polygonsByLayer: [OverlayLayer: [MKPolygon]] = [:]
@@ -162,7 +164,7 @@ final class VisitedHexagonOverlays {
                   !boundary.isEmpty else { continue }
 
             let polygon = MKPolygon(points: boundary, count: boundary.count)
-            let densityLayer: OverlayLayer = switch Self.classifyCell(info: info, resolution: Int(resolution.rawValue), maxLeaves: maxLeaves) {
+            let densityLayer: OverlayLayer = switch Self.classifyCell(info: info, coverage: coverageByCellID[cell.id] ?? 0) {
             case .partial: .partial
             case .dense:   .dense
             case .full:    .full
@@ -233,29 +235,79 @@ final class VisitedHexagonOverlays {
         }
     }
 
-    /// Gives a visited cell its density, from the filter mode and the thresholds in `FilterState`:
-    /// - resolution: the number of visited child cells (a leaf cell is always full),
-    /// - time: how recently the cell was visited,
-    /// - leafCount: the visited leaf cells, as a percentage of the most in the loaded area.
-    private static func classifyCell(info: VisitedCell, resolution: Int, maxLeaves: Int) -> CellDensity {
+    /// Gives a visited cell its density, from the filter mode and the slider positions in `FilterState`.
+    /// `coverage` is used only in coverage mode.
+    private static func classifyCell(info: VisitedCell, coverage: Double) -> CellDensity {
         let filter = FilterState.shared
         switch filter.mode {
-        case .resolution:
-            guard resolution < CellStore.maxResolution else { return .full }
-            if info.visitedChildren >= Int(filter.fullChildrenThreshold)  { return .full }
-            if info.visitedChildren >= Int(filter.denseChildrenThreshold) { return .dense }
-            return .partial
         case .time:
-            let age = Date().timeIntervalSince(info.lastVisitedAt)
-            if age <= filter.veryRecentMaxAge { return .full }
-            if age <= filter.recentMaxAge     { return .dense }
-            return .partial
-        case .leafCount:
-            guard maxLeaves > 0 else { return .partial }
-            let score = Double(info.visitedLeaves) / Double(maxLeaves) * 100
-            if score >= filter.fullLeafPercent  { return .full }
-            if score >= filter.denseLeafPercent { return .dense }
-            return .partial
+            return density(
+                forAge: Date().timeIntervalSince(info.lastVisitedAt),
+                fullMaxAge: FilterState.ageStops[filter.veryRecentAgeStopIndex].value,
+                denseMaxAge: FilterState.ageStops[filter.recentAgeStopIndex].value
+            )
+        case .discovered:
+            return density(
+                forAge: Date().timeIntervalSince(info.firstVisitedAt),
+                fullMaxAge: FilterState.ageStops[filter.newlyDiscoveredAgeStopIndex].value,
+                denseMaxAge: FilterState.ageStops[filter.recentlyDiscoveredAgeStopIndex].value
+            )
+        case .coverage:
+            return density(
+                forAmount: coverage,
+                denseMinimum: FilterState.coverageStops[filter.denseCoverageStopIndex].value,
+                fullMinimum: FilterState.coverageStops[filter.fullCoverageStopIndex].value
+            )
+        case .visits:
+            return density(
+                forAmount: Double(info.visitCount),
+                denseMinimum: FilterState.visitCountStops[filter.denseVisitCountStopIndex].value,
+                fullMinimum: FilterState.visitCountStops[filter.fullVisitCountStopIndex].value
+            )
+        }
+    }
+
+    /// For ages: younger is denser.
+    private static func density(forAge age: TimeInterval, fullMaxAge: TimeInterval, denseMaxAge: TimeInterval) -> CellDensity {
+        if age <= fullMaxAge { return .full }
+        if age <= denseMaxAge { return .dense }
+        return .partial
+    }
+
+    /// For amounts such as coverage or visit count: more is denser.
+    private static func density(forAmount amount: Double, denseMinimum: Double, fullMinimum: Double) -> CellDensity {
+        if amount >= fullMinimum { return .full }
+        if amount >= denseMinimum { return .dense }
+        return .partial
+    }
+
+    /// The coverage of each cell: the fraction of its descendants two resolutions finer that are
+    /// visited (one resolution finer just above the leaf resolution). A leaf cell has coverage 1.
+    /// Two levels down gives 49 descendants: fine enough to show partial coverage, and the same
+    /// meaning at every zoom level.
+    private static func coverageByCellID(of visitedCells: [H3Cell], resolution: H3Cell.Resolution) -> [UInt64: Double] {
+        let descendantResolutionValue = min(Int(resolution.rawValue) + 2, CellStore.maxResolution)
+        guard descendantResolutionValue > Int(resolution.rawValue),
+              let descendantResolution = H3Cell.Resolution(rawValue: Int32(descendantResolutionValue))
+        else { return Dictionary(uniqueKeysWithValues: visitedCells.map { ($0.id, 1.0) }) }
+
+        var descendantIDsByCellID: [UInt64: [UInt64]] = [:]
+        for cell in visitedCells {
+            descendantIDsByCellID[cell.id] = (try? cell.children(at: descendantResolution).map(\.id)) ?? []
+        }
+
+        // Query in chunks, to stay below the SQLite limit for the number of query parameters.
+        let allDescendantIDs = descendantIDsByCellID.values.flatMap { $0 }
+        var visitedDescendantIDs = Set<UInt64>()
+        for chunkStart in stride(from: 0, to: allDescendantIDs.count, by: 10_000) {
+            let chunk = allDescendantIDs[chunkStart..<min(chunkStart + 10_000, allDescendantIDs.count)]
+            visitedDescendantIDs.formUnion(CellStore.shared.visitedCells(among: Set(chunk)).keys)
+        }
+
+        return descendantIDsByCellID.mapValues { descendantIDs in
+            guard !descendantIDs.isEmpty else { return 0 }
+            let visitedCount = descendantIDs.filter { visitedDescendantIDs.contains($0) }.count
+            return Double(visitedCount) / Double(descendantIDs.count)
         }
     }
 

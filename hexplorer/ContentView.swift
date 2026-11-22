@@ -163,12 +163,7 @@ struct ContentView: View {
             if let mapView { refreshHexagonOverlay(on: mapView) }
         }
         .onChange(of: filterState.mode)                  { if let mapView { refreshHexagonOverlay(on: mapView) } }
-        .onChange(of: filterState.recentAgeStopIndex)     { if let mapView { refreshHexagonOverlay(on: mapView) } }
-        .onChange(of: filterState.veryRecentAgeStopIndex) { if let mapView { refreshHexagonOverlay(on: mapView) } }
-        .onChange(of: filterState.denseChildrenThreshold) { if let mapView { refreshHexagonOverlay(on: mapView) } }
-        .onChange(of: filterState.fullChildrenThreshold)  { if let mapView { refreshHexagonOverlay(on: mapView) } }
-        .onChange(of: filterState.denseLeafPercent)       { if let mapView { refreshHexagonOverlay(on: mapView) } }
-        .onChange(of: filterState.fullLeafPercent)        { if let mapView { refreshHexagonOverlay(on: mapView) } }
+        .onChange(of: filterState.thresholdStopIndices)   { if let mapView { refreshHexagonOverlay(on: mapView) } }
         .fileExporter(
             isPresented: $showExportPicker,
             document: exportDocument,
