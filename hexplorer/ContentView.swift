@@ -69,13 +69,17 @@ struct ContentView: View {
                     }
                     ////filter options
                     Button(action: { activePanel = activePanel == .filterOptions ? nil : .filterOptions }) {
-                        Image(systemName: "slider.horizontal.3")
+                        // The active display mode, so it is clear what the map colors mean.
+                        Image(systemName: filterState.mode.systemImage)
                             .font(.headline)
+                            // Same size for each icon, so the button does not change width with the mode.
+                            .frame(width: 22, height: 22)
                             .padding()
                             .background(.secondary.opacity(0.8))
                             .foregroundStyle(.white)
                             .clipShape(Capsule())
                     }
+                    .accessibilityLabel("Display mode: \(filterState.mode.rawValue)")
                     ////menu
                     Menu {
                         Button(action: exportDatabase) {

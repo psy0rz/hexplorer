@@ -30,7 +30,7 @@ struct FilterOptionsPanel: View {
                 }
             }
             .pickerStyle(.segmented)
-            Text(filter.mode.explanation)
+            Label(filter.mode.explanation, systemImage: filter.mode.systemImage)
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

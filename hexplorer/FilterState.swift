@@ -14,6 +14,16 @@ enum FilterMode: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    /// The SF Symbol of the mode, on the filter button and next to the explanation in the panel.
+    var systemImage: String {
+        switch self {
+        case .time:       "clock"
+        case .coverage:   "square.grid.3x3.fill"
+        case .visits:     "repeat"
+        case .discovered: "sparkles"
+        }
+    }
+
     /// One sentence for the filter panel that tells what the mode shows.
     var explanation: String {
         switch self {
