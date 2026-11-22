@@ -10,6 +10,12 @@ struct FilterOptionsPanel: View {
                 Label("Display Mode", systemImage: "slider.horizontal.3")
                     .font(.headline)
                 Spacer()
+                Button("Reset", systemImage: "arrow.counterclockwise") { filter.resetActiveModeToDefaults() }
+                    .labelStyle(.iconOnly)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Reset \(filter.mode.rawValue) to defaults")
                 Button { onClose?() } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.secondary)
@@ -24,6 +30,10 @@ struct FilterOptionsPanel: View {
                 }
             }
             .pickerStyle(.segmented)
+            Text(filter.mode.explanation)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             Divider()
             modeControls
         }

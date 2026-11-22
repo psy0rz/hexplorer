@@ -13,6 +13,16 @@ enum FilterMode: String, CaseIterable, Identifiable {
     case discovered = "Discovered"
 
     var id: String { rawValue }
+
+    /// One sentence for the filter panel that tells what the mode shows.
+    var explanation: String {
+        switch self {
+        case .time:       "Colors cells by how recently you were last there."
+        case .coverage:   "Colors cells by how well you explored them: 0.5 is about one route through the cell, 1 is everything."
+        case .visits:     "Colors cells by how many times you came back to them."
+        case .discovered: "Colors cells by when you visited them for the first time."
+        }
+    }
 }
 
 /// The filter settings. Each mode has a list of stops for its slider, and two indices into that
@@ -31,34 +41,34 @@ final class FilterState {
     }
 
     // Time: visited at most `veryRecent` ago → full, at most `recent` ago → dense, older → partial.
-    var veryRecentAgeStopIndex = FilterState.storedStopIndex(forKey: "filter.time.veryRecentAge", in: FilterState.ageStops, defaultLabel: "1 d") {
+    var veryRecentAgeStopIndex = FilterState.storedStopIndex(forKey: "filter.time.veryRecentAge", in: FilterState.ageStops, defaultLabel: DefaultStopLabel.veryRecentAge) {
         didSet { Self.storeStop(at: veryRecentAgeStopIndex, in: Self.ageStops, forKey: "filter.time.veryRecentAge") }
     }
-    var recentAgeStopIndex = FilterState.storedStopIndex(forKey: "filter.time.recentAge", in: FilterState.ageStops, defaultLabel: "1 wk") {
+    var recentAgeStopIndex = FilterState.storedStopIndex(forKey: "filter.time.recentAge", in: FilterState.ageStops, defaultLabel: DefaultStopLabel.recentAge) {
         didSet { Self.storeStop(at: recentAgeStopIndex, in: Self.ageStops, forKey: "filter.time.recentAge") }
     }
 
     // Coverage: an exploration score of at least `full` → full, at least `dense` → dense, less → partial.
-    var denseCoverageStopIndex = FilterState.storedStopIndex(forKey: "filter.coverage.dense", in: FilterState.coverageStops, defaultLabel: "0.50") {
+    var denseCoverageStopIndex = FilterState.storedStopIndex(forKey: "filter.coverage.dense", in: FilterState.coverageStops, defaultLabel: DefaultStopLabel.denseCoverage) {
         didSet { Self.storeStop(at: denseCoverageStopIndex, in: Self.coverageStops, forKey: "filter.coverage.dense") }
     }
-    var fullCoverageStopIndex = FilterState.storedStopIndex(forKey: "filter.coverage.full", in: FilterState.coverageStops, defaultLabel: "0.70") {
+    var fullCoverageStopIndex = FilterState.storedStopIndex(forKey: "filter.coverage.full", in: FilterState.coverageStops, defaultLabel: DefaultStopLabel.fullCoverage) {
         didSet { Self.storeStop(at: fullCoverageStopIndex, in: Self.coverageStops, forKey: "filter.coverage.full") }
     }
 
     // Visits: at least `full` visits → full, at least `dense` visits → dense, fewer → partial.
-    var denseVisitCountStopIndex = FilterState.storedStopIndex(forKey: "filter.visits.dense", in: FilterState.visitCountStops, defaultLabel: "2") {
+    var denseVisitCountStopIndex = FilterState.storedStopIndex(forKey: "filter.visits.dense", in: FilterState.visitCountStops, defaultLabel: DefaultStopLabel.denseVisitCount) {
         didSet { Self.storeStop(at: denseVisitCountStopIndex, in: Self.visitCountStops, forKey: "filter.visits.dense") }
     }
-    var fullVisitCountStopIndex = FilterState.storedStopIndex(forKey: "filter.visits.full", in: FilterState.visitCountStops, defaultLabel: "5") {
+    var fullVisitCountStopIndex = FilterState.storedStopIndex(forKey: "filter.visits.full", in: FilterState.visitCountStops, defaultLabel: DefaultStopLabel.fullVisitCount) {
         didSet { Self.storeStop(at: fullVisitCountStopIndex, in: Self.visitCountStops, forKey: "filter.visits.full") }
     }
 
     // Discovered: first visited at most `newly` ago → full, at most `recently` ago → dense, older → partial.
-    var newlyDiscoveredAgeStopIndex = FilterState.storedStopIndex(forKey: "filter.discovered.newlyAge", in: FilterState.ageStops, defaultLabel: "1 wk") {
+    var newlyDiscoveredAgeStopIndex = FilterState.storedStopIndex(forKey: "filter.discovered.newlyAge", in: FilterState.ageStops, defaultLabel: DefaultStopLabel.newlyDiscoveredAge) {
         didSet { Self.storeStop(at: newlyDiscoveredAgeStopIndex, in: Self.ageStops, forKey: "filter.discovered.newlyAge") }
     }
-    var recentlyDiscoveredAgeStopIndex = FilterState.storedStopIndex(forKey: "filter.discovered.recentlyAge", in: FilterState.ageStops, defaultLabel: "1 mo") {
+    var recentlyDiscoveredAgeStopIndex = FilterState.storedStopIndex(forKey: "filter.discovered.recentlyAge", in: FilterState.ageStops, defaultLabel: DefaultStopLabel.recentlyDiscoveredAge) {
         didSet { Self.storeStop(at: recentlyDiscoveredAgeStopIndex, in: Self.ageStops, forKey: "filter.discovered.recentlyAge") }
     }
 
@@ -71,6 +81,43 @@ final class FilterState {
     }
 
     private init() {}
+
+    // MARK: - Defaults
+
+    /// The default slider positions, as stop labels.
+    private enum DefaultStopLabel {
+        static let veryRecentAge = "1 d"
+        static let recentAge = "1 wk"
+        static let denseCoverage = "0.50"
+        static let fullCoverage = "0.70"
+        static let denseVisitCount = "2"
+        static let fullVisitCount = "5"
+        static let newlyDiscoveredAge = "1 wk"
+        static let recentlyDiscoveredAge = "1 mo"
+    }
+
+    /// Sets the two slider positions of the active mode back to their defaults.
+    /// The other modes keep their positions.
+    func resetActiveModeToDefaults() {
+        switch mode {
+        case .time:
+            veryRecentAgeStopIndex = Self.stopIndex(label: DefaultStopLabel.veryRecentAge, in: Self.ageStops)
+            recentAgeStopIndex = Self.stopIndex(label: DefaultStopLabel.recentAge, in: Self.ageStops)
+        case .coverage:
+            denseCoverageStopIndex = Self.stopIndex(label: DefaultStopLabel.denseCoverage, in: Self.coverageStops)
+            fullCoverageStopIndex = Self.stopIndex(label: DefaultStopLabel.fullCoverage, in: Self.coverageStops)
+        case .visits:
+            denseVisitCountStopIndex = Self.stopIndex(label: DefaultStopLabel.denseVisitCount, in: Self.visitCountStops)
+            fullVisitCountStopIndex = Self.stopIndex(label: DefaultStopLabel.fullVisitCount, in: Self.visitCountStops)
+        case .discovered:
+            newlyDiscoveredAgeStopIndex = Self.stopIndex(label: DefaultStopLabel.newlyDiscoveredAge, in: Self.ageStops)
+            recentlyDiscoveredAgeStopIndex = Self.stopIndex(label: DefaultStopLabel.recentlyDiscoveredAge, in: Self.ageStops)
+        }
+    }
+
+    private static func stopIndex(label: String, in stops: [FilterStop]) -> Int {
+        stops.firstIndex { $0.label == label } ?? 0
+    }
 
     // MARK: - Stops
 
@@ -119,9 +166,7 @@ final class FilterState {
     /// or the label is no longer in the list.
     private static func storedStopIndex(forKey key: String, in stops: [FilterStop], defaultLabel: String) -> Int {
         let storedLabel = UserDefaults.standard.string(forKey: key)
-        return stops.firstIndex { $0.label == storedLabel }
-            ?? stops.firstIndex { $0.label == defaultLabel }
-            ?? 0
+        return stops.firstIndex { $0.label == storedLabel } ?? stopIndex(label: defaultLabel, in: stops)
     }
 
     private static func storeStop(at stopIndex: Int, in stops: [FilterStop], forKey key: String) {
