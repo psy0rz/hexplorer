@@ -125,19 +125,33 @@ struct MapView: UIViewRepresentable {
 //        mapView.setRegion(region, animated: false)
         mapView.mapType = .satellite
         mapView.showsUserLocation = true
-        mapView.userTrackingMode = .follow
+        // Restore the last zoom and position. Following the user location only moves the center,
+        // so the zoom stays; without following the map opens where it was left.
+        if let storedRegion = StoredMapViewport.region {
+            mapView.setRegion(storedRegion, animated: false)
+        }
         mapView.register(FlagAnnotationView.self, forAnnotationViewWithReuseIdentifier: FlagAnnotationView.reuseID)
 //        mapView.register(FlagClusterAnnotationView.self, forAnnotationViewWithReuseIdentifier: FlagClusterAnnotationView.reuseID)
 
-        let trackingButton = MKUserTrackingButton(mapView: mapView)
-        trackingButton.translatesAutoresizingMaskIntoConstraints = false
-        trackingButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
-        trackingButton.layer.cornerRadius = 5
-        mapView.addSubview(trackingButton)
+        // A custom button instead of MKUserTrackingButton: MapKit's own follow mode always zooms in.
+        let followButton = context.coordinator.followButton
+        followButton.translatesAutoresizingMaskIntoConstraints = false
+        followButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
+        followButton.layer.cornerRadius = 5
+        followButton.addTarget(context.coordinator, action: #selector(Coordinator.toggleFollowingUserLocation), for: .touchUpInside)
+        mapView.addSubview(followButton)
         NSLayoutConstraint.activate([
-            trackingButton.topAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.topAnchor, constant: 60),
-            trackingButton.trailingAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.trailingAnchor, constant: -10),
+            followButton.topAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.topAnchor, constant: 60),
+            followButton.trailingAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.trailingAnchor, constant: -10),
+            followButton.widthAnchor.constraint(equalToConstant: 44),
+            followButton.heightAnchor.constraint(equalToConstant: 44),
         ])
+
+        // A pan with one finger stops following, as in Apple Maps; a pinch zoom does not.
+        let panGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
+        panGesture.maximumNumberOfTouches = 1
+        panGesture.delegate = context.coordinator
+        mapView.addGestureRecognizer(panGesture)
 
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
         tapGesture.delegate = context.coordinator
@@ -169,10 +183,51 @@ extension MapView {
             VisitedHexagonOverlays.shared.renderer(for: overlay) ?? MKOverlayRenderer(overlay: overlay)
         }
 
-        func mapView(_ mapView: MKMapView, didChange mode: MKUserTrackingMode, animated: Bool) {
-            if mode == .followWithHeading {
-                mapView.setUserTrackingMode(.follow, animated: animated)
+        // MARK: Following the user location
+
+        let followButton = UIButton(type: .system)
+
+        /// When true, the map moves its center to each new user location and keeps its zoom.
+        var followsUserLocation = StoredMapViewport.followsUserLocation {
+            didSet {
+                StoredMapViewport.followsUserLocation = followsUserLocation
+                updateFollowButtonImage()
             }
+        }
+
+        override init() {
+            super.init()
+            updateFollowButtonImage()
+        }
+
+        private func updateFollowButtonImage() {
+            followButton.setImage(UIImage(systemName: followsUserLocation ? "location.fill" : "location"), for: .normal)
+        }
+
+        @objc func toggleFollowingUserLocation() {
+            followsUserLocation.toggle()
+            if followsUserLocation, let mapView, let userCoordinate = mapView.userLocation.location?.coordinate {
+                mapView.setCenter(userCoordinate, animated: true)
+            }
+        }
+
+        @objc func handlePan(_ gesture: UIPanGestureRecognizer) {
+            if gesture.state == .began { followsUserLocation = false }
+        }
+
+        func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
+            guard followsUserLocation, let userCoordinate = userLocation.location?.coordinate else { return }
+            mapView.setCenter(userCoordinate, animated: true)
+        }
+
+        /// The pan recognizer only watches; MapKit's own gestures must still move the map.
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            gestureRecognizer is UIPanGestureRecognizer
+        }
+
+        /// Called once at the end of each pan or zoom, so the viewport is stored only when it settles.
+        func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            StoredMapViewport.region = mapView.region
         }
 
         @objc func handleTap(_ gesture: UITapGestureRecognizer) {
@@ -202,7 +257,8 @@ extension MapView {
         // We use a coordinate-distance check (50 pt radius) to cover the balloon
         // which renders above the annotation view's anchor frame.
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
-            guard let mapView = gestureRecognizer.view as? MKMapView else { return true }
+            guard gestureRecognizer is UITapGestureRecognizer,
+                  let mapView = gestureRecognizer.view as? MKMapView else { return true }
             let point = touch.location(in: mapView)
             for annotation in mapView.annotations {
                 guard annotation is FlagAnnotation || annotation is MKClusterAnnotation else { continue }
@@ -239,6 +295,50 @@ extension MapView {
             SelectedCellState.shared.currentZoomResolution = Int(res.rawValue)
             VisitedHexagonOverlays.shared.mapViewportDidChange(mapView)
         }
+    }
+}
+
+// MARK: - Stored viewport
+
+/// The map viewport of the last session, in UserDefaults: the visible region (center and zoom)
+/// and whether the map follows the user location (see `MapView.Coordinator.followsUserLocation`).
+enum StoredMapViewport {
+    private static let centerLatitudeKey = "map.centerLatitude"
+    private static let centerLongitudeKey = "map.centerLongitude"
+    private static let latitudeDeltaKey = "map.latitudeDelta"
+    private static let longitudeDeltaKey = "map.longitudeDelta"
+    private static let followsUserLocationKey = "map.followsUserLocation"
+
+    /// `nil` until a region was stored for the first time.
+    static var region: MKCoordinateRegion? {
+        get {
+            let defaults = UserDefaults.standard
+            guard defaults.object(forKey: latitudeDeltaKey) != nil else { return nil }
+            return MKCoordinateRegion(
+                center: CLLocationCoordinate2D(
+                    latitude: defaults.double(forKey: centerLatitudeKey),
+                    longitude: defaults.double(forKey: centerLongitudeKey)
+                ),
+                span: MKCoordinateSpan(
+                    latitudeDelta: defaults.double(forKey: latitudeDeltaKey),
+                    longitudeDelta: defaults.double(forKey: longitudeDeltaKey)
+                )
+            )
+        }
+        set {
+            guard let newValue else { return }
+            let defaults = UserDefaults.standard
+            defaults.set(newValue.center.latitude, forKey: centerLatitudeKey)
+            defaults.set(newValue.center.longitude, forKey: centerLongitudeKey)
+            defaults.set(newValue.span.latitudeDelta, forKey: latitudeDeltaKey)
+            defaults.set(newValue.span.longitudeDelta, forKey: longitudeDeltaKey)
+        }
+    }
+
+    /// `true` on the first launch, so a new user starts at their own location.
+    static var followsUserLocation: Bool {
+        get { UserDefaults.standard.object(forKey: followsUserLocationKey) as? Bool ?? true }
+        set { UserDefaults.standard.set(newValue, forKey: followsUserLocationKey) }
     }
 }
 
