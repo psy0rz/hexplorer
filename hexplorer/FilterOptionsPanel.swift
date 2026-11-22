@@ -40,12 +40,28 @@ struct FilterOptionsPanel: View {
             sliderRow(label: "Dense from", value: $filter.denseChildrenThreshold, range: 1...7, unit: "children")
             sliderRow(label: "Full from",  value: $filter.fullChildrenThreshold,  range: 1...7, unit: "children")
         case .time:
-            sliderRow(label: "Very recent", value: $filter.veryRecentHours, range: 1...72, unit: "h")
-            sliderRow(label: "Recent",      value: $filter.recentDays,      range: 1...90, unit: "d")
+            timeSlider
         case .leafCount:
             sliderRow(label: "Dense from", value: $filter.denseLeafPercent, range: 1...99,  unit: "%")
             sliderRow(label: "Full from",  value: $filter.fullLeafPercent,  range: 1...100, unit: "%")
         }
+    }
+
+    /// One track for the three time levels: full (visited very recently), dense (recently)
+    /// and partial (longer ago). The two thumbs are the borders between the levels.
+    private var timeSlider: some View {
+        let ageStops = FilterState.ageStops
+        let colors = OverlayColors.shared
+
+        return TwoThumbStopSlider(
+            lowerStopIndex: $filter.veryRecentAgeStopIndex,
+            upperStopIndex: $filter.recentAgeStopIndex,
+            stopCount: ageStops.count,
+            stopLabel: { ageStops[$0].label },
+            lowerSegmentColor: colors.full,
+            middleSegmentColor: colors.dense,
+            upperSegmentColor: .secondary.opacity(0.3)
+        )
     }
 
     @ViewBuilder

@@ -247,8 +247,8 @@ final class VisitedHexagonOverlays {
             return .partial
         case .time:
             let age = Date().timeIntervalSince(info.lastVisitedAt)
-            if age <= filter.veryRecentHours * 3600 { return .full }
-            if age <= filter.recentDays * 86400     { return .dense }
+            if age <= filter.veryRecentMaxAge { return .full }
+            if age <= filter.recentMaxAge     { return .dense }
             return .partial
         case .leafCount:
             guard maxLeaves > 0 else { return .partial }
