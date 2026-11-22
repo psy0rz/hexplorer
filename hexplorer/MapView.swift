@@ -165,6 +165,10 @@ extension MapView {
         /// Called when the user taps a flag annotation directly.
         var onFlagEdit: ((MapFlag) -> Void)?
 
+        func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
+            VisitedHexagonOverlays.shared.renderer(for: overlay) ?? MKOverlayRenderer(overlay: overlay)
+        }
+
         func mapView(_ mapView: MKMapView, didChange mode: MKUserTrackingMode, animated: Bool) {
             if mode == .followWithHeading {
                 mapView.setUserTrackingMode(.follow, animated: animated)
@@ -233,6 +237,7 @@ extension MapView {
             let latitude = mapView.centerCoordinate.latitude
             let res = h3Resolution(for: zoomScale, latitude: latitude)
             SelectedCellState.shared.currentZoomResolution = Int(res.rawValue)
+            VisitedHexagonOverlays.shared.mapViewportDidChange(mapView)
         }
     }
 }
@@ -246,7 +251,7 @@ extension Notification.Name {
 // MARK: - Shared helpers
 
 func refreshHexagonOverlay(on mapView: MKMapView) {
-    VisitedHexagonsState.shared.reloadHexagons(on: mapView)
+    VisitedHexagonOverlays.shared.reloadHexagons(on: mapView)
 }
 
 /// Full sync: removes stale annotations and adds missing ones.

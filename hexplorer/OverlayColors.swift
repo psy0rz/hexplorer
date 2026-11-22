@@ -6,7 +6,7 @@ final class OverlayColors {
     static let shared = OverlayColors()
 
     var partial      = Color(red: 1, green: 1, blue: 1.0).opacity(1)
-    var partialWidth = 1.0
+    var partialWidth = 0.5
 //    var partialFill  = Color.white.opacity(0.0)
 
     var dense        = Color(red: 1, green: 1, blue: 1).opacity(0.5)

@@ -12,7 +12,7 @@ enum FilterMode: String, CaseIterable, Identifiable {
 final class FilterState {
     static let shared = FilterState()
 
-    var mode: FilterMode = .resolution
+    var mode: FilterMode = .time
 
     // Time mode
     var recentDays: Double = 7       // → dense
