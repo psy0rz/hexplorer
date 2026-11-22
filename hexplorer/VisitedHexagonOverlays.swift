@@ -34,8 +34,9 @@ func h3Resolution(for zoomScale: MKZoomScale, latitude: Double) -> H3Cell.Resolu
 enum CellDensity { case partial, dense, full }
 
 /// Shows the visited cells as native MapKit overlays: one overlay for each density, with its
-/// own fill and stroke. MapKit draws them and moves them with the map; this class only
-/// replaces them when the loaded cells change.
+/// own fill and stroke, on top of one dark halo overlay for all cells. The halo keeps the
+/// light outlines visible on light map backgrounds. MapKit draws the overlays and moves them
+/// with the map; this class only replaces them when the loaded cells change.
 @Observable
 final class VisitedHexagonOverlays {
     static let shared = VisitedHexagonOverlays()
@@ -45,6 +46,7 @@ final class VisitedHexagonOverlays {
     @ObservationIgnored private var loadedMapRect = MKMapRect.null
     @ObservationIgnored private var loadedResolution: H3Cell.Resolution?
 
+    @ObservationIgnored private var haloOverlay: MKMultiPolygon?
     @ObservationIgnored private var partialOverlay: MKMultiPolygon?
     @ObservationIgnored private var denseOverlay: MKMultiPolygon?
     @ObservationIgnored private var fullOverlay: MKMultiPolygon?
@@ -77,7 +79,10 @@ final class VisitedHexagonOverlays {
         let colors = OverlayColors.shared
         let renderer = MKMultiPolygonRenderer(multiPolygon: multiPolygon)
 
-        if multiPolygon === partialOverlay {
+        if multiPolygon === haloOverlay {
+            renderer.strokeColor = UIColor(colors.halo)
+            renderer.lineWidth = colors.haloWidth
+        } else if multiPolygon === partialOverlay {
             renderer.strokeColor = UIColor(colors.partial)
             renderer.lineWidth = colors.partialWidth
         } else if multiPolygon === denseOverlay {
@@ -133,14 +138,17 @@ final class VisitedHexagonOverlays {
 
     /// Adds the new overlays before it removes the old ones, so the map does not flicker.
     private func replaceOverlays(partialPolygons: [MKPolygon], densePolygons: [MKPolygon], fullPolygons: [MKPolygon], on mapView: MKMapView) {
-        let oldOverlays = [partialOverlay, denseOverlay, fullOverlay].compactMap { $0 }
+        let oldOverlays = [haloOverlay, partialOverlay, denseOverlay, fullOverlay].compactMap { $0 }
+        let allPolygons = partialPolygons + densePolygons + fullPolygons
 
+        haloOverlay = allPolygons.isEmpty ? nil : MKMultiPolygon(allPolygons)
         partialOverlay = partialPolygons.isEmpty ? nil : MKMultiPolygon(partialPolygons)
         denseOverlay = densePolygons.isEmpty ? nil : MKMultiPolygon(densePolygons)
         fullOverlay = fullPolygons.isEmpty ? nil : MKMultiPolygon(fullPolygons)
 
-        // The order sets the drawing order: on a shared edge, the denser cell is on top.
-        let newOverlays = [partialOverlay, denseOverlay, fullOverlay].compactMap { $0 }
+        // The order sets the drawing order: the halo below everything, and
+        // on a shared edge the denser cell on top.
+        let newOverlays = [haloOverlay, partialOverlay, denseOverlay, fullOverlay].compactMap { $0 }
         mapView.addOverlays(newOverlays, level: .aboveLabels)
         mapView.removeOverlays(oldOverlays)
     }
