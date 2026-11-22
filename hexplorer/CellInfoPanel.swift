@@ -32,11 +32,17 @@ struct CellInfoPanel: View {
         return min(Double(info.visitedLeaves) / total, 1.0)
     }
 
+    /// The score that the coverage filter uses (see `VisitedHexagonOverlays.explorationScore`).
+    private var explorationScore: Double {
+        guard let info, let cellResolution = H3Cell.Resolution(rawValue: Int32(resolution)) else { return 0 }
+        return VisitedHexagonOverlays.explorationScore(visitedLeaves: info.visitedLeaves, resolution: cellResolution)
+    }
+
     private var coverageText: String {
         guard let info else { return "Not yet visited" }
         let isLeaf = resolution >= CellStore.maxResolution
         let leaves = isLeaf ? 1 : info.visitedLeaves
-        return "\(leaves) \(leaves == 1 ? "cell" : "cells") · \(Int(leafFraction * 100))%"
+        return "\(leaves) \(leaves == 1 ? "cell" : "cells") · \(Int(leafFraction * 100))% · score \(String(format: "%.2f", explorationScore))"
     }
 
     private var cellIDHex: String {
@@ -100,6 +106,7 @@ struct CellInfoPanel: View {
         LabeledContent("Size", value: edgeLength)
         LabeledContent("First visit", value: info.map { $0.firstVisitedAt.formatted(.relative(presentation: .named)) } ?? "—")
         LabeledContent("Last visit", value: info.map { $0.lastVisitedAt.formatted(.relative(presentation: .named)) } ?? "—")
+        LabeledContent("Visits", value: info.map { "\($0.visitCount)" } ?? "—")
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 Text("Coverage")

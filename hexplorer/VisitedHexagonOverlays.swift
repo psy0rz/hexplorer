@@ -283,7 +283,7 @@ final class VisitedHexagonOverlays {
     /// about √leafCount leaves, so it scores 0.5 at every resolution; a network of routes scores
     /// about 0.75, and a fully visited cell 1. A single visited point scores 0, and a visited
     /// leaf cell scores 1.
-    private static func explorationScore(visitedLeaves: Int, resolution: H3Cell.Resolution) -> Double {
+    static func explorationScore(visitedLeaves: Int, resolution: H3Cell.Resolution) -> Double {
         let resolutionStepsToLeaves = CellStore.maxResolution - Int(resolution.rawValue)
         guard resolutionStepsToLeaves > 0 else { return 1 }
         guard visitedLeaves > 1 else { return 0 }
