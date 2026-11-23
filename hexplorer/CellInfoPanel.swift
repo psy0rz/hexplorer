@@ -104,7 +104,7 @@ struct CellInfoPanel: View {
             LabeledContent("Level", value: "\(resolution)")
         }
         LabeledContent("Size", value: edgeLength)
-        LabeledContent("First visit", value: info.map { $0.firstVisitedAt.formatted(.relative(presentation: .named)) } ?? "—")
+        LabeledContent("Discovered", value: info.map { $0.firstVisitedAt.formatted(.relative(presentation: .named)) } ?? "—")
         LabeledContent("Last visit", value: info.map { $0.lastVisitedAt.formatted(.relative(presentation: .named)) } ?? "—")
         LabeledContent("Visits", value: info.map { "\($0.visitCount)" } ?? "—")
         VStack(alignment: .leading, spacing: 4) {

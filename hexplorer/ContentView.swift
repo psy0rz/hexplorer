@@ -6,6 +6,7 @@ import UniformTypeIdentifiers
 private enum ActivePanel: Equatable {
     case flagEditor(MapFlag?)   // nil = new flag, non-nil = editing existing
     case filterOptions
+    case mapLayers
 }
 
 struct ContentView: View {
@@ -26,6 +27,7 @@ struct ContentView: View {
     private var tracker = LocationTracker.shared
     private var selectedCell = SelectedCellState.shared
     private var filterState = FilterState.shared
+    private var mapLayerSettings = MapLayerSettings.shared
 
 //    private var currentH3Resolution: Int {
 //        let lat = mapView?.centerCoordinate.latitude ?? Self.initialRegion.center.latitude
@@ -44,6 +46,9 @@ struct ContentView: View {
                         // Deselect cell so only the flag panel shows.
                         selectedCell.clear()
                     }
+                },
+                onMapLayersButtonTap: {
+                    activePanel = activePanel == .mapLayers ? nil : .mapLayers
                 }
             )
             .edgesIgnoringSafeArea(.all)
@@ -52,6 +57,7 @@ struct ContentView: View {
                 HexagonHighlightView(mapView: mapView)
                     .edgesIgnoringSafeArea(.all)
             }
+
 
             VStack {
                 Spacer()
@@ -157,6 +163,8 @@ struct ContentView: View {
                     .id(flag?.id)
                 } else if activePanel == .filterOptions {
                     FilterOptionsPanel(filter: filterState, onClose: { activePanel = nil })
+                } else if activePanel == .mapLayers {
+                    MapLayersPanel(settings: mapLayerSettings, onClose: { activePanel = nil })
                 }
             }
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selectedCell.selectedCellIndex != nil)
@@ -178,6 +186,9 @@ struct ContentView: View {
             // Setting isAppActive flushes the buffer, so the reload includes all visits.
             if isAppActive, let mapView { refreshHexagonOverlay(on: mapView) }
         }
+        .onChange(of: mapLayerSettings.mapStyle)             { applyMapLayerSettings() }
+        .onChange(of: mapLayerSettings.showsSatelliteLabels)  { applyMapLayerSettings() }
+        .onChange(of: mapLayerSettings.showsPointsOfInterest) { applyMapLayerSettings() }
         .onChange(of: filterState.mode)                  { if let mapView { refreshHexagonOverlay(on: mapView) } }
         .onChange(of: filterState.thresholdStopIndices)   { if let mapView { refreshHexagonOverlay(on: mapView) } }
         .fileExporter(
@@ -195,6 +206,10 @@ struct ContentView: View {
         ) { result in
             importDatabase(result: result)
         }
+    }
+
+    private func applyMapLayerSettings() {
+        mapView?.preferredConfiguration = mapLayerSettings.makeMapConfiguration()
     }
 
     private func toggleTracking() {

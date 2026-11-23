@@ -118,12 +118,14 @@ final class FlagClusterAnnotationView: MKAnnotationView {
 struct MapView: UIViewRepresentable {
 //    let region: MKCoordinateRegion
     var onMapViewCreated: (MKMapView) -> Void
+    /// Called when the user taps the layers button, to open the layers panel.
+    var onMapLayersButtonTap: () -> Void
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
         mapView.delegate = context.coordinator
 //        mapView.setRegion(region, animated: false)
-        mapView.mapType = .satellite
+        mapView.preferredConfiguration = MapLayerSettings.shared.makeMapConfiguration()
         mapView.showsUserLocation = true
         // Restore the last zoom and position. Following the user location only moves the center,
         // so the zoom stays; without following the map opens where it was left.
@@ -133,19 +135,7 @@ struct MapView: UIViewRepresentable {
         mapView.register(FlagAnnotationView.self, forAnnotationViewWithReuseIdentifier: FlagAnnotationView.reuseID)
 //        mapView.register(FlagClusterAnnotationView.self, forAnnotationViewWithReuseIdentifier: FlagClusterAnnotationView.reuseID)
 
-        // A custom button instead of MKUserTrackingButton: MapKit's own follow mode always zooms in.
-        let followButton = context.coordinator.followButton
-        followButton.translatesAutoresizingMaskIntoConstraints = false
-        followButton.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.8)
-        followButton.layer.cornerRadius = 5
-        followButton.addTarget(context.coordinator, action: #selector(Coordinator.toggleFollowingUserLocation), for: .touchUpInside)
-        mapView.addSubview(followButton)
-        NSLayoutConstraint.activate([
-            followButton.topAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.topAnchor, constant: 60),
-            followButton.trailingAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.trailingAnchor, constant: -10),
-            followButton.widthAnchor.constraint(equalToConstant: 44),
-            followButton.heightAnchor.constraint(equalToConstant: 44),
-        ])
+        addMapControls(to: mapView, coordinator: context.coordinator)
 
         // A pan with one finger stops following, as in Apple Maps; a pinch zoom does not.
         let panGesture = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handlePan(_:)))
@@ -163,7 +153,52 @@ struct MapView: UIViewRepresentable {
         return mapView
     }
 
-    func updateUIView(_ uiView: MKMapView, context: Context) {}
+    func updateUIView(_ uiView: MKMapView, context: Context) {
+        context.coordinator.onMapLayersButtonTap = onMapLayersButtonTap
+    }
+
+    /// Adds the layers button and the follow button at the top right, as one Liquid Glass capsule
+    /// with a thin line between the buttons, as in Apple Maps.
+    private func addMapControls(to mapView: MKMapView, coordinator: Coordinator) {
+        let layersButton = coordinator.layersButton
+        layersButton.setImage(UIImage(systemName: "square.2.layers.3d"), for: .normal)
+        layersButton.accessibilityLabel = "Map layers"
+        layersButton.addTarget(coordinator, action: #selector(Coordinator.showMapLayers), for: .touchUpInside)
+
+        // A custom button instead of MKUserTrackingButton: MapKit's own follow mode always zooms in.
+        let followButton = coordinator.followButton
+        followButton.addTarget(coordinator, action: #selector(Coordinator.toggleFollowingUserLocation), for: .touchUpInside)
+
+        let buttonSeparator = UIView()
+        buttonSeparator.backgroundColor = .separator
+
+        let buttonStack = UIStackView(arrangedSubviews: [layersButton, buttonSeparator, followButton])
+        buttonStack.axis = .vertical
+
+        // Interactive glass reacts to touches, as the system map controls do.
+        let controlsGlassEffect = UIGlassEffect()
+        controlsGlassEffect.isInteractive = true
+        let controlsBox = UIVisualEffectView(effect: controlsGlassEffect)
+        controlsBox.translatesAutoresizingMaskIntoConstraints = false
+        controlsBox.cornerConfiguration = .capsule()
+        buttonStack.translatesAutoresizingMaskIntoConstraints = false
+        controlsBox.contentView.addSubview(buttonStack)
+        mapView.addSubview(controlsBox)
+
+        let buttonSize: CGFloat = 44
+        NSLayoutConstraint.activate([
+            controlsBox.topAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.topAnchor, constant: 70),
+            controlsBox.trailingAnchor.constraint(equalTo: mapView.safeAreaLayoutGuide.trailingAnchor, constant: -10),
+            buttonStack.topAnchor.constraint(equalTo: controlsBox.topAnchor),
+            buttonStack.bottomAnchor.constraint(equalTo: controlsBox.bottomAnchor),
+            buttonStack.leadingAnchor.constraint(equalTo: controlsBox.leadingAnchor),
+            buttonStack.trailingAnchor.constraint(equalTo: controlsBox.trailingAnchor),
+            layersButton.widthAnchor.constraint(equalToConstant: buttonSize),
+            layersButton.heightAnchor.constraint(equalToConstant: buttonSize),
+            followButton.heightAnchor.constraint(equalToConstant: buttonSize),
+            buttonSeparator.heightAnchor.constraint(equalToConstant: 0.5),
+        ])
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -178,6 +213,15 @@ extension MapView {
 
         /// Called when the user taps a flag annotation directly.
         var onFlagEdit: ((MapFlag) -> Void)?
+
+        /// Called when the user taps the layers button.
+        var onMapLayersButtonTap: (() -> Void)?
+
+        let layersButton = UIButton(type: .system)
+
+        @objc func showMapLayers() {
+            onMapLayersButtonTap?()
+        }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             VisitedHexagonOverlays.shared.renderer(for: overlay) ?? MKOverlayRenderer(overlay: overlay)
