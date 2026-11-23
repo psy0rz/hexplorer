@@ -48,8 +48,18 @@ struct FlagEditorPanel: View {
     @ViewBuilder
     private var headerRow: some View {
         HStack {
-            Label(existingFlag == nil ? "New Flag" : "Edit Flag", systemImage: "flag.fill")
-                .font(.headline)
+            // Same icon as the map marker; "mappin" matches the marker's default glyph.
+            // The icon sits in a circle of the selected colour, like the marker balloon.
+            Label {
+                Text(existingFlag == nil ? "New Flag" : "Edit Flag")
+            } icon: {
+                Image(systemName: priority.symbolName ?? "mappin")
+                    .font(.footnote)
+                    .foregroundStyle(.white)
+                    .frame(width: 26, height: 26)
+                    .background(Color(color.uiColor), in: Circle())
+            }
+            .font(.headline)
 //                .foregroundStyle(Color(existingFlag?.color.uiColor ?? FlagColor.red.uiColor))
             Spacer()
             Button { onCancel?() } label: {
@@ -82,8 +92,8 @@ struct FlagEditorPanel: View {
 
         // Priority
         Picker("Priority", selection: $priority) {
-            ForEach(FlagPriority.allCases) { p in
-                Text(p.label).tag(p)
+            ForEach(FlagPriority.allCases) { flagPriority in
+                Text(flagPriority.label).tag(flagPriority)
             }
         }
         .pickerStyle(.segmented)

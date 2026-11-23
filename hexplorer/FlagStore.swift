@@ -50,6 +50,15 @@ enum FlagPriority: String, Codable, CaseIterable, Identifiable {
         case .low:      return "Low"
         }
     }
+
+    /// SF Symbol shown on the map marker and in the editor picker; nil shows no icon.
+    var symbolName: String? {
+        switch self {
+        case .required: return "star.fill"
+        case .high:     return "flag.fill"
+        case .low:      return nil
+        }
+    }
 }
 
 // MARK: - Model

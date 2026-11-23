@@ -40,10 +40,8 @@ final class FlagAnnotationView: MKMarkerAnnotationView {
         displayPriority = flagAnnotation.flag.priority.displayPriority
         // Show the label beneath the balloon only for high-visibility flags.
         titleVisibility = flagAnnotation.flag.priority == .low ? .hidden : .adaptive
-        glyphImage = switch flagAnnotation.flag.priority {
-        case .required: UIImage(systemName: "flag.fill")
-        case .high:     UIImage(systemName: "flag")
-        case .low:      UIImage(systemName: "arrow.down")
+        if let symbolName = flagAnnotation.flag.priority.symbolName {
+            glyphImage = UIImage(systemName: symbolName)
         }
     }
 }
