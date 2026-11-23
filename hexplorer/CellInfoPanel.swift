@@ -50,6 +50,17 @@ struct CellInfoPanel: View {
         return String(id, radix: 16, uppercase: true)
     }
 
+    /// The center of the selected cell, packaged for the share sheet.
+    private var sharedCellLocation: SharedCellLocation? {
+        guard let id = state.selectedCellIndex,
+              let center = try? H3Cell(id).center else { return nil }
+        return SharedCellLocation(
+            name: "Hexplorer cell \(cellIDHex)",
+            latitude: center.latitudeDegs,
+            longitude: center.longitudeDegs
+        )
+    }
+
     private var resolutionBinding: Binding<Int> {
         Binding(
             get: { resolution },
@@ -135,6 +146,16 @@ struct CellInfoPanel: View {
         HStack {
             Spacer()
 
+            if let sharedCellLocation {
+                Button {
+                    sharedCellLocation.presentShareSheet()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.body)
+                        .padding(8)
+                }
+                .buttonStyle(.bordered)
+            }
 
             Button(role: .destructive) { showDeleteConfirmation = true } label: {
                 Image(systemName: "trash").font(.body).padding(8)
@@ -166,7 +187,6 @@ struct CellInfoPanel: View {
         }
     }
 }
-
 
 private extension Array {
     subscript(safe index: Int) -> Element? {

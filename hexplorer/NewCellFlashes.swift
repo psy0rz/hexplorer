@@ -11,7 +11,7 @@ final class NewCellFlashes {
     static let shared = NewCellFlashes()
 
     /// How long a flash takes to fade out.
-    private static let fadeDuration: Duration = .seconds(1)
+    private static let fadeDuration: Duration = .seconds(0.3)
     /// The number of opacity steps of the fade. Few steps keep the redraws, and so the energy, low.
     private static let fadeStepCount = 30
 
