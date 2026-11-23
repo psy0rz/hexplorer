@@ -24,6 +24,9 @@ struct ContentView: View {
     @State private var activePanel: ActivePanel? = nil
     @Environment(\.scenePhase) private var scenePhase
 
+    /// The icon frame of the round buttons at the bottom, so all three buttons have the same size.
+    private static let bottomButtonIconSize: CGFloat = 22
+
     private var tracker = LocationTracker.shared
     private var selectedCell = SelectedCellState.shared
     private var filterState = FilterState.shared
@@ -61,53 +64,57 @@ struct ContentView: View {
 
             VStack {
                 Spacer()
-                HStack(spacing: 16) {
-                    ////tracking button
-                    Button(action: toggleTracking) {
-                        HStack {
-                            Image(systemName: tracker.isTracking ? "location.fill" : "location")
-                            Text(tracker.isTracking ? "Stop" : "Track")
+                // One container, so SwiftUI renders the glass of the three buttons together.
+                GlassEffectContainer {
+                    HStack(spacing: 16) {
+                        ////tracking button
+                        Button(action: toggleTracking) {
+                            // The icon shows the state: a location arrow while tracking, a crossed-out one when not.
+                            Image(systemName: tracker.isTracking ? "location.fill" : "location.slash.fill")
+                                .contentTransition(.symbolEffect(.replace))
+                                .font(.headline)
+                                .frame(width: Self.bottomButtonIconSize, height: Self.bottomButtonIconSize)
+                                .padding()
+                                .foregroundStyle(.white)
+                                .glassEffect(.regular.tint(tracker.isTracking ? .red : .green).interactive(), in: .circle)
                         }
-                        .font(.headline)
-                        .padding()
-                        .background(tracker.isTracking ? .red : .green)
-                        .foregroundStyle(.white)
-                        .clipShape(Capsule())
-                    }
-                    ////filter options
-                    Button(action: { activePanel = activePanel == .filterOptions ? nil : .filterOptions }) {
-                        // The active display mode, so it is clear what the map colors mean.
-                        Image(systemName: filterState.mode.systemImage)
-                            .font(.headline)
-                            // Same size for each icon, so the button does not change width with the mode.
-                            .frame(width: 22, height: 22)
-                            .padding()
-                            .background(.secondary.opacity(0.8))
-                            .foregroundStyle(.white)
-                            .clipShape(Capsule())
-                    }
-                    .accessibilityLabel("Display mode: \(filterState.mode.rawValue)")
-                    ////menu
-                    Menu {
-                        Button(action: exportDatabase) {
-                            Label("Export Database", systemImage: "square.and.arrow.up")
+                        .accessibilityLabel(tracker.isTracking ? "Stop tracking" : "Start tracking")
+                        ////filter options
+                        Button(action: { activePanel = activePanel == .filterOptions ? nil : .filterOptions }) {
+                            // The active display mode, so it is clear what the map colors mean.
+                            Image(systemName: filterState.mode.systemImage)
+                                .font(.headline)
+                                // Same size for each icon, so the button does not change width with the mode.
+                                .frame(width: Self.bottomButtonIconSize, height: Self.bottomButtonIconSize)
+                                .padding()
+                                // The app tint color, the same as the icons of the map controls in MapView.
+                                .foregroundStyle(.tint)
+                                .glassEffect(.regular.interactive(), in: .circle)
                         }
-                        Button(action: { showImportPicker = true }) {
-                            Label("Import Database", systemImage: "square.and.arrow.down")
+                        .accessibilityLabel("Display mode: \(filterState.mode.rawValue)")
+                        ////menu
+                        Menu {
+                            Button(action: exportDatabase) {
+                                Label("Export Database", systemImage: "square.and.arrow.up")
+                            }
+                            Button(action: { showImportPicker = true }) {
+                                Label("Import Database", systemImage: "square.and.arrow.down")
+                            }
+//                            Button(action: { showGenerateConfirmation = true }) {
+//                                Label("Generate Test Visits", systemImage: "dice")
+//                            }
+//                            Button(action: { showGenerateFlagsConfirmation = true }) {
+//                                Label("Generate Test Flags", systemImage: "flag")
+//                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.headline)
+                                .frame(width: Self.bottomButtonIconSize, height: Self.bottomButtonIconSize)
+                                .padding()
+                                // The app tint color, the same as the icons of the map controls in MapView.
+                                .foregroundStyle(.tint)
+                                .glassEffect(.regular.interactive(), in: .circle)
                         }
-//                        Button(action: { showGenerateConfirmation = true }) {
-//                            Label("Generate Test Visits", systemImage: "dice")
-//                        }
-//                        Button(action: { showGenerateFlagsConfirmation = true }) {
-//                            Label("Generate Test Flags", systemImage: "flag")
-//                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.headline)
-                            .padding()
-                            .background(.secondary.opacity(0.8))
-                            .foregroundStyle(.white)
-                            .clipShape(Capsule())
                     }
                 }
                 .confirmationDialog(
