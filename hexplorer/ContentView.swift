@@ -80,6 +80,9 @@ struct ContentView: View {
                                 .glassEffect(.regular.tint(tracker.isTracking ? .red : .green).interactive(), in: .circle)
                         }
                         .accessibilityLabel(tracker.isTracking ? "Stop tracking" : "Start tracking")
+                        .sensoryFeedback(trigger: tracker.isTracking) { _, isTrackingNow in
+                            isTrackingNow ? .start : .stop
+                        }
                         ////filter options
                         Button(action: { activePanel = activePanel == .filterOptions ? nil : .filterOptions }) {
                             // The active display mode, so it is clear what the map colors mean.
@@ -179,6 +182,29 @@ struct ContentView: View {
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activePanel != nil)
             .allowsHitTesting(selectedCell.selectedCellIndex != nil || activePanel != nil)
 
+            // While tracking, a pill at the top left with the number of new cells in this session.
+            if tracker.isTracking {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(.red)
+                        .frame(width: 8, height: 8)
+                    Text("Tracking · \(tracker.sessionNewCellCount) new cells")
+                        .contentTransition(.numericText())
+                }
+                .font(.footnote.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .glassEffect(.regular, in: .capsule)
+                .animation(.default, value: tracker.sessionNewCellCount)
+                .accessibilityElement(children: .combine)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                // The same height as the map controls at the top right of MapView.
+                .padding(.top, 60)
+                .padding(.leading, 10)
+                .transition(.opacity)
+                .allowsHitTesting(false)
+            }
+
             // A short message at the top after the user turns tracking on or off.
             if trackingToastIsShown {
                 Label(tracker.isTracking ? "Tracking On" : "Tracking Off",
@@ -206,7 +232,10 @@ struct ContentView: View {
         .onChange(of: tracker.flushCount) {
             // When the app is not active, nobody sees the map. The reload on activation shows the new cells.
             guard scenePhase == .active else { return }
-            if let mapView { refreshHexagonOverlay(on: mapView) }
+            if let mapView {
+                refreshHexagonOverlay(on: mapView)
+                NewCellFlashes.shared.flash(newLeafCellIDs: tracker.lastFlushNewLeafCellIDs, on: mapView)
+            }
         }
         .onChange(of: scenePhase, initial: true) { _, newScenePhase in
             let isAppActive = newScenePhase == .active

@@ -29,6 +29,13 @@ final class LocationTracker {
     private(set) var isTracking = false
     private(set) var flushCount = 0
 
+    /// When the current tracking session started, or nil when not tracking.
+    private(set) var trackingStartDate: Date?
+    /// The number of res-13 cells in this tracking session that were not visited before.
+    private(set) var sessionNewCellCount = 0
+    /// The new res-13 cells of the last flush, for the flash on the map.
+    private(set) var lastFlushNewLeafCellIDs: [UInt64] = []
+
     /// Set from the scene phase. Changes the flush interval, and flushes the buffer
     /// when the app becomes active or stops being active.
     var isAppActive = true {
@@ -58,6 +65,10 @@ final class LocationTracker {
         backgroundSession = CLBackgroundActivitySession()
         isTracking = true
         trackingWasActive = true
+        let newTrackingStartDate = Date()
+        trackingStartDate = newTrackingStartDate
+        sessionNewCellCount = 0
+        TrackingLiveActivityController.shared.start(trackingStartDate: newTrackingStartDate)
         
         scheduleFlushTimer()
 
@@ -115,6 +126,8 @@ final class LocationTracker {
         backgroundSession = nil
 
         lastCellID = 0
+        trackingStartDate = nil
+        TrackingLiveActivityController.shared.end(newCellCount: sessionNewCellCount)
     }
 
     /// Replaces the flush timer with one that fires at the interval for the current app state.
@@ -139,7 +152,12 @@ final class LocationTracker {
             (latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude)
         }
         do {
-            try CellStore.shared.recordVisits(locations: coords)
+            lastFlushNewLeafCellIDs = try CellStore.shared.recordVisits(locations: coords)
+            sessionNewCellCount += lastFlushNewLeafCellIDs.count
+            // Update the Live Activity only when the count changed, to keep the updates few.
+            if !lastFlushNewLeafCellIDs.isEmpty {
+                TrackingLiveActivityController.shared.update(newCellCount: sessionNewCellCount)
+            }
             flushCount += 1
         } catch {
             print("Failed to record visits: \(error)")

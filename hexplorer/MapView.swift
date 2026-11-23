@@ -224,7 +224,9 @@ extension MapView {
         }
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
-            VisitedHexagonOverlays.shared.renderer(for: overlay) ?? MKOverlayRenderer(overlay: overlay)
+            VisitedHexagonOverlays.shared.renderer(for: overlay)
+                ?? NewCellFlashes.shared.renderer(for: overlay)
+                ?? MKOverlayRenderer(overlay: overlay)
         }
 
         // MARK: Following the user location

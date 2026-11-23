@@ -7,16 +7,53 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		EC1270B630B457A30018730A /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EC1270B530B457A30018730A /* WidgetKit.framework */; };
+		EC1270B830B457A30018730A /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = EC1270B730B457A30018730A /* SwiftUI.framework */; };
+		EC1270C330B457A40018730A /* HexplorerWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = EC1270B330B457A30018730A /* HexplorerWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		EC764D2E2F703F7100750BFA /* GRDB in Frameworks */ = {isa = PBXBuildFile; productRef = EC764D2D2F703F7100750BFA /* GRDB */; };
 		ECA0DC612F75D6B500750BFA /* MKZoomLevel in Frameworks */ = {isa = PBXBuildFile; productRef = ECA0DC602F75D6B500750BFA /* MKZoomLevel */; };
 		ECE916BE2F1D3C1B00750BFA /* SwiftyH3 in Frameworks */ = {isa = PBXBuildFile; productRef = ECE916BD2F1D3C1B00750BFA /* SwiftyH3 */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		EC1270C130B457A40018730A /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ECE916A62F1D391900750BFA /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = EC1270B230B457A30018730A;
+			remoteInfo = HexplorerWidgetsExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		EC1270C830B457A40018730A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				EC1270C330B457A40018730A /* HexplorerWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		EC1270B330B457A30018730A /* HexplorerWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = HexplorerWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		EC1270B530B457A30018730A /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = /System/Library/Frameworks/WidgetKit.framework; sourceTree = "<absolute>"; };
+		EC1270B730B457A30018730A /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = /System/Library/Frameworks/SwiftUI.framework; sourceTree = "<absolute>"; };
 		ECE916AE2F1D391900750BFA /* hexplorer.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = hexplorer.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EC1270C730B457A40018730A /* Exceptions for "HexplorerWidgets" folder in "HexplorerWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = EC1270B230B457A30018730A /* HexplorerWidgetsExtension */;
+		};
 		EC764D342F70620400750BFA /* Exceptions for "hexplorer" folder in "hexplorer" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -27,6 +64,14 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		EC1270B930B457A30018730A /* HexplorerWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EC1270C730B457A40018730A /* Exceptions for "HexplorerWidgets" folder in "HexplorerWidgetsExtension" target */,
+			);
+			path = HexplorerWidgets;
+			sourceTree = "<group>";
+		};
 		ECE916B02F1D391900750BFA /* hexplorer */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -38,6 +83,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		EC1270B030B457A30018730A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				EC1270B830B457A30018730A /* SwiftUI.framework in Frameworks */,
+				EC1270B630B457A30018730A /* WidgetKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ECE916AB2F1D391900750BFA /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -51,10 +105,21 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		EC1270B430B457A30018730A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				EC1270B530B457A30018730A /* WidgetKit.framework */,
+				EC1270B730B457A30018730A /* SwiftUI.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		ECE916A52F1D391900750BFA = {
 			isa = PBXGroup;
 			children = (
 				ECE916B02F1D391900750BFA /* hexplorer */,
+				EC1270B930B457A30018730A /* HexplorerWidgets */,
+				EC1270B430B457A30018730A /* Frameworks */,
 				ECE916AF2F1D391900750BFA /* Products */,
 			);
 			sourceTree = "<group>";
@@ -63,6 +128,7 @@
 			isa = PBXGroup;
 			children = (
 				ECE916AE2F1D391900750BFA /* hexplorer.app */,
+				EC1270B330B457A30018730A /* HexplorerWidgetsExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -70,6 +136,28 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		EC1270B230B457A30018730A /* HexplorerWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EC1270C430B457A40018730A /* Build configuration list for PBXNativeTarget "HexplorerWidgetsExtension" */;
+			buildPhases = (
+				EC1270AF30B457A30018730A /* Sources */,
+				EC1270B030B457A30018730A /* Frameworks */,
+				EC1270B130B457A30018730A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				EC1270B930B457A30018730A /* HexplorerWidgets */,
+			);
+			name = HexplorerWidgetsExtension;
+			packageProductDependencies = (
+			);
+			productName = HexplorerWidgetsExtension;
+			productReference = EC1270B330B457A30018730A /* HexplorerWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		ECE916AD2F1D391900750BFA /* hexplorer */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = ECE916B92F1D391B00750BFA /* Build configuration list for PBXNativeTarget "hexplorer" */;
@@ -77,10 +165,12 @@
 				ECE916AA2F1D391900750BFA /* Sources */,
 				ECE916AB2F1D391900750BFA /* Frameworks */,
 				ECE916AC2F1D391900750BFA /* Resources */,
+				EC1270C830B457A40018730A /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				EC1270C230B457A40018730A /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				ECE916B02F1D391900750BFA /* hexplorer */,
@@ -102,9 +192,12 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
-				LastSwiftUpdateCheck = 2620;
+				LastSwiftUpdateCheck = 2720;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
+					EC1270B230B457A30018730A = {
+						CreatedOnToolsVersion = 27.2;
+					};
 					ECE916AD2F1D391900750BFA = {
 						CreatedOnToolsVersion = 26.2;
 					};
@@ -130,11 +223,19 @@
 			projectRoot = "";
 			targets = (
 				ECE916AD2F1D391900750BFA /* hexplorer */,
+				EC1270B230B457A30018730A /* HexplorerWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		EC1270B130B457A30018730A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ECE916AC2F1D391900750BFA /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -145,6 +246,13 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		EC1270AF30B457A30018730A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		ECE916AA2F1D391900750BFA /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -154,7 +262,99 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		EC1270C230B457A40018730A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = EC1270B230B457A30018730A /* HexplorerWidgetsExtension */;
+			targetProxy = EC1270C130B457A40018730A /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		EC1270C530B457A40018730A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = D7253L4FBV;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HexplorerWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HexplorerWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = hexplorer.HexplorerWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 27.2;
+			};
+			name = Debug;
+		};
+		EC1270C630B457A40018730A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = D7253L4FBV;
+				ENABLE_APP_SANDBOX = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = HexplorerWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = HexplorerWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 27.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = hexplorer.HexplorerWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 27.2;
+			};
+			name = Release;
+		};
 		ECE916B72F1D391B00750BFA /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -361,6 +561,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		EC1270C430B457A40018730A /* Build configuration list for PBXNativeTarget "HexplorerWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				EC1270C530B457A40018730A /* Debug */,
+				EC1270C630B457A40018730A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		ECE916A92F1D391900750BFA /* Build configuration list for PBXProject "hexplorer" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

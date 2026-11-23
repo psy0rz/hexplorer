@@ -66,8 +66,11 @@ final class CellStore {
         try recordVisits(locations: [(latitude: latitude, longitude: longitude)])
     }
 
-    func recordVisits(locations: [(latitude: Double, longitude: Double)]) throws {
+    /// Records the visits and returns the res-13 leaf cells that were not visited before.
+    @discardableResult
+    func recordVisits(locations: [(latitude: Double, longitude: Double)]) throws -> [UInt64] {
         let recordStartTime = ContinuousClock.now
+        var newLeafCellIDs: [UInt64] = []
         let now = Date()
         var insertedRowCount = 0
         var updatedRowCount = 0
@@ -81,12 +84,18 @@ final class CellStore {
                 let rowChanges = try Self.recordVisit(in: db, latLng: latLng, now: now, leafResolution: leafResolution)
                 insertedRowCount += rowChanges.insertedRowCount
                 updatedRowCount += rowChanges.updatedRowCount
+                // The leaf is the first cell of the chain, and a known leaf has known parents:
+                // so inserted rows mean that the leaf is new.
+                if rowChanges.insertedRowCount > 0, let leafCell = try? latLng.cell(at: leafResolution) {
+                    newLeafCellIDs.append(leafCell.id)
+                }
                 if rowChanges.insertedRowCount == 0 && rowChanges.updatedRowCount == 0 {
                     unchangedLocationCount += 1
                 }
             }
         }
         print("recordVisits: locations=\(locations.count), inserted=\(insertedRowCount), updated=\(updatedRowCount), unchangedLocations=\(unchangedLocationCount), took \(recordStartTime.duration(to: .now))")
+        return newLeafCellIDs
     }
 
     func generateTestVisits(centerLatitude: Double, centerLongitude: Double, latDelta: Double, lngDelta: Double, count: Int = 10_000) throws {
