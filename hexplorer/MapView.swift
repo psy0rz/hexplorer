@@ -207,7 +207,7 @@ extension MapView {
         @objc func toggleFollowingUserLocation() {
             followsUserLocation.toggle()
             if followsUserLocation, let mapView, let userCoordinate = mapView.userLocation.location?.coordinate {
-                mapView.setCenter(userCoordinate, animated: true)
+                centerMap(mapView, on: userCoordinate)
             }
         }
 
@@ -217,7 +217,32 @@ extension MapView {
 
         func mapView(_ mapView: MKMapView, didUpdate userLocation: MKUserLocation) {
             guard followsUserLocation, let userCoordinate = userLocation.location?.coordinate else { return }
-            mapView.setCenter(userCoordinate, animated: true)
+            centerMap(mapView, on: userCoordinate)
+        }
+
+        /// The duration of a follow move. It is about the time between two location updates,
+        /// so the map moves at a constant speed, together with the animated blue dot.
+        private static let followMoveDuration: TimeInterval = 1
+
+        /// Animates the move only when the coordinate is in or near the visible area. A far move
+        /// jumps directly: an animated pan over a long distance is slow, and loads tiles and
+        /// hexagons for the full path.
+        private func centerMap(_ mapView: MKMapView, on coordinate: CLLocationCoordinate2D) {
+            let visibleMapRect = mapView.visibleMapRect
+            let nearbyMapRect = visibleMapRect.insetBy(dx: -visibleMapRect.width / 2, dy: -visibleMapRect.height / 2)
+            guard nearbyMapRect.contains(MKMapPoint(coordinate)) else {
+                mapView.setCenter(coordinate, animated: false)
+                return
+            }
+            // setCenter(_:animated:) has a fixed duration. A non-animated setCenter in a UIView
+            // animation block uses the duration and the curve of the block instead.
+            UIView.animate(
+                withDuration: Self.followMoveDuration,
+                delay: 0,
+                options: [.curveLinear, .beginFromCurrentState, .allowUserInteraction]
+            ) {
+                mapView.setCenter(coordinate, animated: false)
+            }
         }
 
         /// The pan recognizer only watches; MapKit's own gestures must still move the map.
