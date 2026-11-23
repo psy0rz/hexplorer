@@ -21,6 +21,7 @@ struct ContentView: View {
     @State private var showGenerateConfirmation = false
     @State private var showGenerateFlagsConfirmation = false
     @State private var activePanel: ActivePanel? = nil
+    @Environment(\.scenePhase) private var scenePhase
 
     private var tracker = LocationTracker.shared
     private var selectedCell = SelectedCellState.shared
@@ -167,7 +168,15 @@ struct ContentView: View {
             if newVal != nil { activePanel = nil }
         }
         .onChange(of: tracker.flushCount) {
+            // When the app is not active, nobody sees the map. The reload on activation shows the new cells.
+            guard scenePhase == .active else { return }
             if let mapView { refreshHexagonOverlay(on: mapView) }
+        }
+        .onChange(of: scenePhase, initial: true) { _, newScenePhase in
+            let isAppActive = newScenePhase == .active
+            tracker.isAppActive = isAppActive
+            // Setting isAppActive flushes the buffer, so the reload includes all visits.
+            if isAppActive, let mapView { refreshHexagonOverlay(on: mapView) }
         }
         .onChange(of: filterState.mode)                  { if let mapView { refreshHexagonOverlay(on: mapView) } }
         .onChange(of: filterState.thresholdStopIndices)   { if let mapView { refreshHexagonOverlay(on: mapView) } }

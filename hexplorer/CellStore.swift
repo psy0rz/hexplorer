@@ -67,16 +67,26 @@ final class CellStore {
     }
 
     func recordVisits(locations: [(latitude: Double, longitude: Double)]) throws {
+        let recordStartTime = ContinuousClock.now
         let now = Date()
+        var insertedRowCount = 0
+        var updatedRowCount = 0
+        var unchangedLocationCount = 0
         try db.write { [leafResolution = Self.leafResolution] db in
             for location in locations {
                 let latLng = H3LatLng(
                     latitudeDegs: location.latitude,
                     longitudeDegs: location.longitude
                 )
-                try Self.recordVisit(in: db, latLng: latLng, now: now, leafResolution: leafResolution)
+                let rowChanges = try Self.recordVisit(in: db, latLng: latLng, now: now, leafResolution: leafResolution)
+                insertedRowCount += rowChanges.insertedRowCount
+                updatedRowCount += rowChanges.updatedRowCount
+                if rowChanges.insertedRowCount == 0 && rowChanges.updatedRowCount == 0 {
+                    unchangedLocationCount += 1
+                }
             }
         }
+        print("recordVisits: locations=\(locations.count), inserted=\(insertedRowCount), updated=\(updatedRowCount), unchangedLocations=\(unchangedLocationCount), took \(recordStartTime.duration(to: .now))")
     }
 
     func generateTestVisits(centerLatitude: Double, centerLongitude: Double, latDelta: Double, lngDelta: Double, count: Int = 10_000) throws {
@@ -238,13 +248,16 @@ final class CellStore {
 
     // MARK: - Private
 
+    /// Records one visit and returns how many rows of the parent chain it inserted and updated.
     private static func recordVisit(
         in db: Database,
         latLng: H3LatLng,
         now: Date,
         leafResolution: H3Cell.Resolution
-    ) throws {
-        guard let leafCell = try? latLng.cell(at: leafResolution) else { return }
+    ) throws -> (insertedRowCount: Int, updatedRowCount: Int) {
+        var insertedRowCount = 0
+        var updatedRowCount = 0
+        guard let leafCell = try? latLng.cell(at: leafResolution) else { return (insertedRowCount, updatedRowCount) }
 
         // 1. Walk the parent chain to collect all cell IDs.
         var chain: [H3Cell] = []
@@ -269,7 +282,7 @@ final class CellStore {
             let isLeaf = current == leafCell
             if var existing = existingMap[current.id] {
                 let countVisit = now.timeIntervalSince(existing.lastVisitedAt) > 60
-                if !countVisit && !childIsNew && !leafIsNew { return }
+                if !countVisit && !childIsNew && !leafIsNew { return (insertedRowCount, updatedRowCount) }
                 if countVisit { existing.visitCount += 1 }
                 existing.lastVisitedAt = now
                 if isLeaf {
@@ -279,6 +292,7 @@ final class CellStore {
                 }
                 if leafIsNew { existing.visitedLeaves += 1 }
                 try existing.update(db)
+                updatedRowCount += 1
                 childIsNew = false
             } else {
                 try VisitedCell(
@@ -289,9 +303,11 @@ final class CellStore {
                     visitedChildren: childIsNew ? 1 : 0,
                     visitedLeaves: leafIsNew ? 1 : 0
                 ).insert(db)
+                insertedRowCount += 1
                 childIsNew = true
                 if isLeaf { leafIsNew = true }
             }
         }
+        return (insertedRowCount, updatedRowCount)
     }
 }
