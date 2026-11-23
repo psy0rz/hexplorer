@@ -305,6 +305,15 @@ extension MapView {
             return nil
         }
 
+        /// Makes the blue dot not selectable: no "My Location" callout and no pointer highlight.
+        /// A tap on the dot then selects the hexagon cell below it.
+        func mapView(_ mapView: MKMapView, didAdd views: [MKAnnotationView]) {
+            for annotationView in views where annotationView.annotation is MKUserLocation {
+                annotationView.isEnabled = false
+                annotationView.canShowCallout = false
+            }
+        }
+
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
             guard let flagAnnotation = view.annotation as? FlagAnnotation else { return }
             // Immediately deselect so MapKit doesn't hold selection state.
