@@ -45,9 +45,18 @@ enum FlagPriority: String, Codable, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .required: return "Always visible"
-        case .high:     return "High"
-        case .low:      return "Low"
+        case .required: return "Always show"
+        case .high:     return "Normal"
+        case .low:      return "Hide first"
+        }
+    }
+
+    /// One-line explanation of the marker behaviour, shown under the editor picker.
+    var behaviourDescription: String {
+        switch self {
+        case .required: return "Stays on the map when markers overlap."
+        case .high:     return ""
+        case .low:      return "Hides first when markers overlap. No label."
         }
     }
 

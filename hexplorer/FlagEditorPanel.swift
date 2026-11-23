@@ -98,6 +98,10 @@ struct FlagEditorPanel: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+
+        Text(priority.behaviourDescription)
+            .font(.caption)
+            .foregroundStyle(.secondary)
     }
 
     @ViewBuilder
