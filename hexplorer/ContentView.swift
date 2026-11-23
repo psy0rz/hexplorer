@@ -22,6 +22,7 @@ struct ContentView: View {
     @State private var showGenerateConfirmation = false
     @State private var showGenerateFlagsConfirmation = false
     @State private var activePanel: ActivePanel? = nil
+    @State private var trackingToastIsShown = false
     @Environment(\.scenePhase) private var scenePhase
 
     /// The icon frame of the round buttons at the bottom, so all three buttons have the same size.
@@ -177,10 +178,30 @@ struct ContentView: View {
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: selectedCell.selectedCellIndex != nil)
             .animation(.spring(response: 0.35, dampingFraction: 0.8), value: activePanel != nil)
             .allowsHitTesting(selectedCell.selectedCellIndex != nil || activePanel != nil)
+
+            // A short message at the top after the user turns tracking on or off.
+            if trackingToastIsShown {
+                Label(tracker.isTracking ? "Tracking On" : "Tracking Off",
+                      systemImage: tracker.isTracking ? "location.fill" : "location.slash.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .glassEffect(.regular, in: .capsule)
+                    .frame(maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .allowsHitTesting(false)
+            }
         }
         .onChange(of: selectedCell.selectedCellIndex) { _, newVal in
             // Dismiss flag editor if the user taps a cell (not a flag callout).
             if newVal != nil { activePanel = nil }
+        }
+        // Each tap changes isTracking and so restarts this task: the message stays 2 s after the last tap.
+        // A restart cancels the old sleep; the guard then stops the old task before it hides the message.
+        .task(id: tracker.isTracking) {
+            guard (try? await Task.sleep(for: .seconds(2))) != nil else { return }
+            withAnimation { trackingToastIsShown = false }
         }
         .onChange(of: tracker.flushCount) {
             // When the app is not active, nobody sees the map. The reload on activation shows the new cells.
@@ -224,6 +245,9 @@ struct ContentView: View {
             tracker.stopTracking()
         } else {
             tracker.startTracking()
+        }
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+            trackingToastIsShown = true
         }
     }
 
