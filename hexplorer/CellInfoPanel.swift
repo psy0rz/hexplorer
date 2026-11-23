@@ -144,6 +144,28 @@ struct CellInfoPanel: View {
     @ViewBuilder
     private var footerRow: some View {
         HStack {
+            if let sharedCellLocation {
+                Button {
+                    sharedCellLocation.openInAppleMaps()
+                } label: {
+                    Image(systemName: "map")
+                        .font(.body)
+                        .padding(8)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Open in Apple Maps")
+
+                Button {
+                    sharedCellLocation.openDirectionsInAppleMaps()
+                } label: {
+                    Image(systemName: "arrow.triangle.turn.up.right.diamond")
+                        .font(.body)
+                        .padding(8)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Directions in Apple Maps")
+            }
+
             Spacer()
 
             if let sharedCellLocation {

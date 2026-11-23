@@ -31,6 +31,61 @@ struct SharedCellLocation {
         return components.url!
     }
 
+    /// Opens Street View at the location in the Google Maps app when it is installed, else in the browser.
+    var googleStreetViewURL: URL {
+        var components = URLComponents(string: "https://www.google.com/maps/@")!
+        components.queryItems = [
+            URLQueryItem(name: "api", value: "1"),
+            URLQueryItem(name: "map_action", value: "pano"),
+            URLQueryItem(name: "viewpoint", value: String(format: "%.6f,%.6f", latitude, longitude))
+        ]
+        return components.url!
+    }
+
+    /// Shows a marker at the location on openstreetmap.org.
+    var openStreetMapURL: URL {
+        let coordinateText = String(format: "%.6f/%.6f", latitude, longitude)
+        var components = URLComponents(string: "https://www.openstreetmap.org/")!
+        components.queryItems = [
+            URLQueryItem(name: "mlat", value: String(format: "%.6f", latitude)),
+            URLQueryItem(name: "mlon", value: String(format: "%.6f", longitude))
+        ]
+        components.fragment = "map=17/\(coordinateText)"
+        return components.url!
+    }
+
+    private var appleMapsItem: MKMapItem {
+        let mapItem = MKMapItem(location: CLLocation(latitude: latitude, longitude: longitude), address: nil)
+        mapItem.name = name
+        return mapItem
+    }
+
+    @MainActor
+    func openInAppleMaps() {
+        appleMapsItem.openInMaps()
+    }
+
+    /// Opens Apple Maps with directions from the current location to this location.
+    @MainActor
+    func openDirectionsInAppleMaps() {
+        appleMapsItem.openInMaps(launchOptions: [MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeDefault])
+    }
+
+    @MainActor
+    func openInGoogleMaps() {
+        UIApplication.shared.open(googleMapsURL)
+    }
+
+    @MainActor
+    func openInGoogleStreetView() {
+        UIApplication.shared.open(googleStreetViewURL)
+    }
+
+    @MainActor
+    func openInOpenStreetMap() {
+        UIApplication.shared.open(openStreetMapURL)
+    }
+
     var locationVCard: String {
         [
             "BEGIN:VCARD",
@@ -62,14 +117,10 @@ struct SharedCellLocation {
         }
         // Apple Maps and Google Maps have no share extension, so they get their own "Open in" actions.
         let openInMapsActivities = [
-            OpenLocationActivity(title: "Open in Apple Maps", systemImageName: "map") {
-                let mapItem = MKMapItem(location: CLLocation(latitude: latitude, longitude: longitude), address: nil)
-                mapItem.name = name
-                mapItem.openInMaps()
-            },
-            OpenLocationActivity(title: "Open in Google Maps", systemImageName: "globe") {
-                UIApplication.shared.open(googleMapsURL)
-            }
+            OpenLocationActivity(title: "Open in Google Maps", systemImageName: "globe") { openInGoogleMaps() },
+            OpenLocationActivity(title: "Open in Street View", systemImageName: "binoculars") { openInGoogleStreetView() },
+            OpenLocationActivity(title: "Open in OpenStreetMap", systemImageName: "map.circle") { openInOpenStreetMap() },
+            OpenLocationActivity(title: "Open in Apple Maps", systemImageName: "map") { openInAppleMaps() },
         ]
         let shareController = UIActivityViewController(activityItems: activityItems, applicationActivities: openInMapsActivities)
 
