@@ -81,7 +81,7 @@ final class UserLocationFollower: NSObject, UIGestureRecognizerDelegate {
         let cellsInVisitOrder = CellStore.shared.cellsVisitedLast(
             atResolution: SelectedCellState.shared.currentZoomResolution, count: 10)
         CellFlasher.shared.flash(cells: cellsInVisitOrder.map { H3Cell($0.h3Index) },
-                                 color: .systemYellow,
+                                 color: .systemBlue,
                                  on: mapView,
                                  replacesQueuedFlashes: true)
     }

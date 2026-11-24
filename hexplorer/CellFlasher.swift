@@ -54,7 +54,7 @@ final class CellFlasher {
     func renderer(for overlay: any MKOverlay) -> MKOverlayRenderer? {
         guard let flashPolygon = overlay as? CellFlashPolygon else { return nil }
         let renderer = MKPolygonRenderer(polygon: flashPolygon)
-        renderer.fillColor = flashPolygon.flashColor.withAlphaComponent(0.6)
+        renderer.fillColor = flashPolygon.flashColor.withAlphaComponent(0.8)
         renderer.strokeColor = .white
         renderer.lineWidth = 2
         return renderer
