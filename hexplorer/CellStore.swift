@@ -63,15 +63,15 @@ final class CellStore {
     // MARK: - Public API
 
     func recordVisit(latitude: Double, longitude: Double) throws {
-        try recordVisits(locations: [(latitude: latitude, longitude: longitude)])
+        try recordVisits(locations: [(latitude: latitude, longitude: longitude, visitedAt: Date())])
     }
 
     /// Records the visits and returns the res-13 leaf cells that were not visited before.
+    /// `visitedAt` is the time of the GPS fix, not the time of the write.
     @discardableResult
-    func recordVisits(locations: [(latitude: Double, longitude: Double)]) throws -> [UInt64] {
+    func recordVisits(locations: [(latitude: Double, longitude: Double, visitedAt: Date)]) throws -> [UInt64] {
         let recordStartTime = ContinuousClock.now
         var newLeafCellIDs: [UInt64] = []
-        let now = Date()
         var insertedRowCount = 0
         var updatedRowCount = 0
         var unchangedLocationCount = 0
@@ -81,7 +81,7 @@ final class CellStore {
                     latitudeDegs: location.latitude,
                     longitudeDegs: location.longitude
                 )
-                let rowChanges = try Self.recordVisit(in: db, latLng: latLng, now: now, leafResolution: leafResolution)
+                let rowChanges = try Self.recordVisit(in: db, latLng: latLng, visitedAt: location.visitedAt, leafResolution: leafResolution)
                 insertedRowCount += rowChanges.insertedRowCount
                 updatedRowCount += rowChanges.updatedRowCount
                 // The leaf is the first cell of the chain, and a known leaf has known parents:
@@ -99,11 +99,12 @@ final class CellStore {
     }
 
     func generateTestVisits(centerLatitude: Double, centerLongitude: Double, latDelta: Double, lngDelta: Double, count: Int = 10_000) throws {
-        var locations: [(latitude: Double, longitude: Double)] = []
+        var locations: [(latitude: Double, longitude: Double, visitedAt: Date)] = []
+        let visitedAt = Date()
         for _ in 0..<count {
             let lat = centerLatitude + Double.random(in: -latDelta/2...latDelta/2)
             let lng = centerLongitude + Double.random(in: -lngDelta/2...lngDelta/2)
-            locations.append((latitude: lat, longitude: lng))
+            locations.append((latitude: lat, longitude: lng, visitedAt: visitedAt))
         }
         try recordVisits(locations: locations)
     }
@@ -261,7 +262,7 @@ final class CellStore {
     private static func recordVisit(
         in db: Database,
         latLng: H3LatLng,
-        now: Date,
+        visitedAt: Date,
         leafResolution: H3Cell.Resolution
     ) throws -> (insertedRowCount: Int, updatedRowCount: Int) {
         var insertedRowCount = 0
@@ -290,10 +291,10 @@ final class CellStore {
         for current in chain {
             let isLeaf = current == leafCell
             if var existing = existingMap[current.id] {
-                let countVisit = now.timeIntervalSince(existing.lastVisitedAt) > 60
+                let countVisit = visitedAt.timeIntervalSince(existing.lastVisitedAt) > 300
                 if !countVisit && !childIsNew && !leafIsNew { return (insertedRowCount, updatedRowCount) }
                 if countVisit { existing.visitCount += 1 }
-                existing.lastVisitedAt = now
+                existing.lastVisitedAt = visitedAt
                 if isLeaf {
                     existing.visitedChildren = 7
                 } else if childIsNew {
@@ -306,8 +307,8 @@ final class CellStore {
             } else {
                 try VisitedCell(
                     h3Index: current.id,
-                    firstVisitedAt: now,
-                    lastVisitedAt: now,
+                    firstVisitedAt: visitedAt,
+                    lastVisitedAt: visitedAt,
                     visitCount: 1,
                     visitedChildren: childIsNew ? 1 : 0,
                     visitedLeaves: leafIsNew ? 1 : 0

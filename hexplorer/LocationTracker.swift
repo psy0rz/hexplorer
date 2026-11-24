@@ -148,11 +148,11 @@ final class LocationTracker {
         let locationsToWrite = locationBuffer
         locationBuffer.removeAll()
 
-        let coords = locationsToWrite.map {
-            (latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude)
+        let visits = locationsToWrite.map {
+            (latitude: $0.coordinate.latitude, longitude: $0.coordinate.longitude, visitedAt: $0.timestamp)
         }
         do {
-            lastFlushNewLeafCellIDs = try CellStore.shared.recordVisits(locations: coords)
+            lastFlushNewLeafCellIDs = try CellStore.shared.recordVisits(locations: visits)
             sessionNewCellCount += lastFlushNewLeafCellIDs.count
             // Update the Live Activity only when the count changed, to keep the updates few.
             if !lastFlushNewLeafCellIDs.isEmpty {
