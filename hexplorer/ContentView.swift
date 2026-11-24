@@ -223,7 +223,9 @@ struct ContentView: View {
             guard scenePhase == .active else { return }
             if let mapView {
                 VisitedHexagonOverlays.shared.reloadHexagons(on: mapView)
-                NewCellFlashes.shared.flash(newLeafCellIDs: tracker.lastFlushNewLeafCellIDs, on: mapView)
+                CellFlasher.shared.flash(cells: displayedCells(containing: tracker.lastFlushNewLeafCellIDs),
+                                         color: .systemYellow,
+                                         on: mapView)
             }
         }
         .onChange(of: scenePhase, initial: true) { _, newScenePhase in
@@ -252,6 +254,20 @@ struct ContentView: View {
         ) { result in
             importDatabase(result: result)
         }
+    }
+
+    /// Returns the cells at the resolution that the map shows now, that contain the leaf cells.
+    /// Several leaf cells in the same displayed cell give one displayed cell. The order of the leaf cells stays.
+    private func displayedCells(containing leafCellIDs: [UInt64]) -> [H3Cell] {
+        guard let displayedResolution = H3Cell.Resolution(rawValue: Int32(selectedCell.currentZoomResolution))
+        else { return [] }
+        var displayedCells: [H3Cell] = []
+        for leafCellID in leafCellIDs {
+            guard let displayedCell = try? H3Cell(leafCellID).parent(at: displayedResolution),
+                  !displayedCells.contains(displayedCell) else { continue }
+            displayedCells.append(displayedCell)
+        }
+        return displayedCells
     }
 
     private func applyMapLayerSettings() {

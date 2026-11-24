@@ -81,7 +81,7 @@ extension MapView {
 
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             VisitedHexagonOverlays.shared.renderer(for: overlay)
-                ?? NewCellFlashes.shared.renderer(for: overlay)
+                ?? CellFlasher.shared.renderer(for: overlay)
                 ?? MKOverlayRenderer(overlay: overlay)
         }
 
