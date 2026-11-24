@@ -146,7 +146,7 @@ The priority of a flag controls when it stays visible:
 
 | Priority | Behaviour |
 |---|---|
-| Always show | Stays on the map when markers overlap |
+| Always show | Stays on the map when markers overlap, and never joins a cluster |
 | Normal | The default |
 | Hide first | Hides first when markers overlap, and shows no label |
 

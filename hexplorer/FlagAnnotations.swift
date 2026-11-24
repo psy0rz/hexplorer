@@ -24,11 +24,10 @@ final class FlagAnnotation: NSObject, MKAnnotation {
 /// label and display priority from the flag.
 final class FlagAnnotationView: MKMarkerAnnotationView {
     static let reuseID = "flag"
-    private static let clusteringIdentifier = "flags"
 
     override init(annotation: (any MKAnnotation)?, reuseIdentifier: String?) {
         super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-        clusteringIdentifier = Self.clusteringIdentifier
+        clusteringIdentifier = Self.clusteringIdentifier(for: annotation)
         canShowCallout = false
     }
 
@@ -39,7 +38,14 @@ final class FlagAnnotationView: MKMarkerAnnotationView {
     /// Sets the clustering identifier again when a reused view gets a new flag. MapKit decides the
     /// clusters after it sets the annotation and before `prepareForDisplay`, so a later value has no effect.
     override var annotation: (any MKAnnotation)? {
-        willSet { clusteringIdentifier = Self.clusteringIdentifier }
+        willSet { clusteringIdentifier = Self.clusteringIdentifier(for: newValue) }
+    }
+
+    /// "Always show" flags get no identifier, so they never join a cluster and always show on their own.
+    private static func clusteringIdentifier(for annotation: (any MKAnnotation)?) -> String? {
+        guard let flagAnnotation = annotation as? FlagAnnotation,
+              flagAnnotation.flag.priority != .required else { return nil }
+        return "flags"
     }
 
     /// MapKit reuses marker views, so this sets every display property again for each flag.
@@ -85,7 +91,7 @@ final class FlagClusterAnnotationView: MKAnnotationView {
             ?? memberFlags.first
         let circleColor = highestPriorityFlag?.color.uiColor ?? .systemGray
 
-        image = drawCircle(color: circleColor, text: "\(cluster.memberAnnotations.count)")
+        image = drawCircle(color: circleColor, text: "geert \(cluster.memberAnnotations.count)")
     }
 
     private func drawCircle(color: UIColor, text: String) -> UIImage {
