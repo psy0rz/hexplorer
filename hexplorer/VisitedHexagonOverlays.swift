@@ -3,7 +3,7 @@ import MapKit
 import SwiftyH3
 
 /// Target hexagon edge length in screen points.
-private let targetEdgePixels: Double = 20
+private let targetEdgePixels: Double = 15
 
 /// Precomputed average edge lengths in meters for each H3 resolution (0–15).
 private let h3EdgeLengthMeters: [Double] = (0...15).map { res in
