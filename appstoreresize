@@ -1,0 +1,24 @@
+#!/bin/zsh
+# Resizes all .mp4 screen recordings in the current directory to 886×1920 at 30 fps for the App Store,
+# and cuts them to the first 30 seconds (the App Store maximum for app previews).
+# Skips a recording if its resized file already exists.
+
+# (N): no error when there are no .mp4 files.
+for input_path in *.(mp4|MP4)(N); do
+    output_path="$input_path-resized.mov"
+
+    if [[ -e "$output_path" ]]; then
+        echo "Skip (already done): $input_path"
+        continue
+    fi
+
+    # Write to a temporary file first, so an interrupted run does not leave a
+    # half-written file that the next run would skip as "already done".
+    temporary_output_path="$input_path-resizing.mov"
+    if ffmpeg -nostdin -y -i "$input_path" -t 30 -vf scale=886:1920 -c:v libx264 -r 30 "$temporary_output_path"; then
+        mv "$temporary_output_path" "$output_path"
+    else
+        rm -f "$temporary_output_path"
+        echo "Failed: $input_path"
+    fi
+done
