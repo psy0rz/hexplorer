@@ -256,6 +256,25 @@ final class CellStore {
         }
     }
 
+    /// Returns the `count` cells at the resolution that were last visited most recently. The list is in time order, oldest first.
+    func cellsVisitedLast(atResolution resolution: Int, count: Int) -> [VisitedCell] {
+        do {
+            return try db.read { db in
+                let sql = """
+                    SELECT * FROM visitedCell
+                    WHERE (h3Index >> 52) & 0xF = ?
+                    ORDER BY lastVisitedAt DESC, h3Index DESC
+                    LIMIT ?
+                    """
+                // The query gives the most recent cell first, so reverse it into time order.
+                return try VisitedCell.fetchAll(db, sql: sql, arguments: [resolution, count]).reversed()
+            }
+        } catch {
+            print("CellStore query error: \(error)")
+            return []
+        }
+    }
+
     /// Returns the given cell, with at most `count` cells at the same resolution that were last visited
     /// just before it and at most `count` that were last visited just after it. The list is in time order, oldest first.
     /// Cells with the same `lastVisitedAt` are ordered by `h3Index`, so the order is always the same.
