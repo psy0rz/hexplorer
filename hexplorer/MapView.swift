@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 import SwiftyH3
+import UIKit.UIGestureRecognizerSubclass
 
 // MARK: - Annotation model
 
@@ -141,6 +142,12 @@ struct MapView: UIViewRepresentable {
         panGesture.delegate = context.coordinator
         mapView.addGestureRecognizer(panGesture)
 
+        // While a finger touches the map, a follow move stops and no new one starts,
+        // so MapKit's own pan and zoom gestures get the map.
+        let mapTouchGesture = MapTouchGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleMapTouch(_:)))
+        mapTouchGesture.delegate = context.coordinator
+        mapView.addGestureRecognizer(mapTouchGesture)
+
         let tapGesture = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleTap(_:)))
         tapGesture.delegate = context.coordinator
         mapView.addGestureRecognizer(tapGesture)
@@ -268,34 +275,83 @@ extension MapView {
         /// so the map moves at a constant speed, together with the animated blue dot.
         private static let followMoveDuration: TimeInterval = 1
 
-        /// Animates the move only when the coordinate is in or near the visible area. A far move
-        /// jumps directly: an animated pan over a long distance is slow, and loads tiles and
-        /// hexagons for the full path.
+        /// True while one or more fingers touch the map.
+        private var mapIsTouched = false
+
+        /// Calls `stepFollowMove` once per frame while a follow move runs; nil when no move runs.
+        private var followMoveDisplayLink: CADisplayLink?
+        private var followMoveStartPoint = MKMapPoint()
+        private var followMoveTargetPoint = MKMapPoint()
+        private var followMoveStartTime: CFTimeInterval = 0
+
+        /// Moves the map center to the coordinate. The move is smooth only when the coordinate is
+        /// in or near the visible area. A far move jumps directly: a smooth pan over a long distance
+        /// is slow, and loads tiles and hexagons for the full path.
+        ///
+        /// The smooth move sets the center without animation on each frame. An animation
+        /// (`UIView.animate` or `setCenter(_:animated: true)`) would block MapKit's pan and zoom
+        /// gestures while it runs, and with a location update each second it nearly always runs.
         private func centerMap(_ mapView: MKMapView, on coordinate: CLLocationCoordinate2D) {
+            guard !mapIsTouched else { return }
+
             let visibleMapRect = mapView.visibleMapRect
             let nearbyMapRect = visibleMapRect.insetBy(dx: -visibleMapRect.width / 2, dy: -visibleMapRect.height / 2)
             guard nearbyMapRect.contains(MKMapPoint(coordinate)) else {
+                stopFollowMove()
                 mapView.setCenter(coordinate, animated: false)
                 return
             }
-            // setCenter(_:animated:) has a fixed duration. A non-animated setCenter in a UIView
-            // animation block uses the duration and the curve of the block instead.
-            UIView.animate(
-                withDuration: Self.followMoveDuration,
-                delay: 0,
-                options: [.curveLinear, .beginFromCurrentState, .allowUserInteraction]
-            ) {
-                mapView.setCenter(coordinate, animated: false)
+
+            // A new move starts from where the map is now, also when the previous move has not ended.
+            followMoveStartPoint = MKMapPoint(mapView.centerCoordinate)
+            followMoveTargetPoint = MKMapPoint(coordinate)
+            followMoveStartTime = CACurrentMediaTime()
+            if followMoveDisplayLink == nil {
+                let displayLink = CADisplayLink(target: self, selector: #selector(stepFollowMove))
+                displayLink.add(to: .main, forMode: .common)
+                followMoveDisplayLink = displayLink
             }
         }
 
-        /// The pan recognizer only watches; MapKit's own gestures must still move the map.
+        /// Moves the map center one frame further, at a constant speed, from the start to the target.
+        @objc private func stepFollowMove() {
+            guard let mapView else { stopFollowMove(); return }
+            let moveProgress = min((CACurrentMediaTime() - followMoveStartTime) / Self.followMoveDuration, 1)
+            let framePoint = MKMapPoint(
+                x: followMoveStartPoint.x + (followMoveTargetPoint.x - followMoveStartPoint.x) * moveProgress,
+                y: followMoveStartPoint.y + (followMoveTargetPoint.y - followMoveStartPoint.y) * moveProgress
+            )
+            // Stop before the last frame, so `regionDidChangeAnimated` stores the final region.
+            if moveProgress >= 1 { stopFollowMove() }
+            mapView.setCenter(framePoint.coordinate, animated: false)
+        }
+
+        private func stopFollowMove() {
+            followMoveDisplayLink?.invalidate()
+            followMoveDisplayLink = nil
+        }
+
+        @objc func handleMapTouch(_ gesture: MapTouchGestureRecognizer) {
+            switch gesture.state {
+            case .began:
+                mapIsTouched = true
+                stopFollowMove()
+            case .ended, .cancelled, .failed:
+                mapIsTouched = false
+            default:
+                break
+            }
+        }
+
+        /// The pan and touch recognizers only watch; MapKit's own gestures must still move the map.
         func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-            gestureRecognizer is UIPanGestureRecognizer
+            gestureRecognizer is UIPanGestureRecognizer || gestureRecognizer is MapTouchGestureRecognizer
         }
 
         /// Called once at the end of each pan or zoom, so the viewport is stored only when it settles.
         func mapView(_ mapView: MKMapView, regionDidChangeAnimated animated: Bool) {
+            // A follow move changes the region on each frame; only its last frame is stored.
+            guard followMoveDisplayLink == nil else { return }
             StoredMapViewport.region = mapView.region
         }
 
@@ -373,6 +429,43 @@ extension MapView {
             SelectedCellState.shared.currentZoomResolution = Int(res.rawValue)
             VisitedHexagonOverlays.shared.mapViewportDidChange(mapView)
         }
+    }
+}
+
+// MARK: - Map touch recognizer
+
+/// Begins when the first finger touches the map and ends when the last finger lifts.
+/// It recognizes together with the other gestures and does not cancel their touches,
+/// so it only reports the touch.
+final class MapTouchGestureRecognizer: UIGestureRecognizer {
+    private var activeTouchCount = 0
+
+    override init(target: Any?, action: Selector?) {
+        super.init(target: target, action: action)
+        cancelsTouchesInView = false
+        delaysTouchesEnded = false
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
+        activeTouchCount += touches.count
+        state = state == .possible ? .began : .changed
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        removeTouches(touches)
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        removeTouches(touches)
+    }
+
+    override func reset() {
+        activeTouchCount = 0
+    }
+
+    private func removeTouches(_ touches: Set<UITouch>) {
+        activeTouchCount -= touches.count
+        state = activeTouchCount > 0 ? .changed : .ended
     }
 }
 
