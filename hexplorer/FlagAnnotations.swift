@@ -63,6 +63,7 @@ final class FlagAnnotationView: MKMarkerAnnotationView {
 
 // MARK: - Cluster view
 
+///NOTE: disabled
 /// Shows the count of clustered flags as a circle in the colour of the highest-priority member.
 final class FlagClusterAnnotationView: MKAnnotationView {
     static let reuseID = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
@@ -91,7 +92,7 @@ final class FlagClusterAnnotationView: MKAnnotationView {
             ?? memberFlags.first
         let circleColor = highestPriorityFlag?.color.uiColor ?? .systemGray
 
-        image = drawCircle(color: circleColor, text: "geert \(cluster.memberAnnotations.count)")
+        image = drawCircle(color: circleColor, text: "\(cluster.memberAnnotations.count)")
     }
 
     private func drawCircle(color: UIColor, text: String) -> UIImage {
