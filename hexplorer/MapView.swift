@@ -136,11 +136,17 @@ extension MapView {
             }
         }
 
+        /// Deselects each tapped flag or cluster at once. MapKit does not split or join a selected
+        /// cluster, so a cluster that stays selected looks like a normal marker after a zoom.
         func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
-            guard let flagAnnotation = view.annotation as? FlagAnnotation else { return }
-            // Immediately deselect so MapKit doesn't hold selection state.
-            mapView.deselectAnnotation(flagAnnotation, animated: false)
-            onFlagTap?(flagAnnotation.flag)
+            if let flagAnnotation = view.annotation as? FlagAnnotation {
+                mapView.deselectAnnotation(flagAnnotation, animated: false)
+                onFlagTap?(flagAnnotation.flag)
+            } else if let clusterAnnotation = view.annotation as? MKClusterAnnotation {
+                mapView.deselectAnnotation(clusterAnnotation, animated: false)
+                // Zoom in until the flags of the cluster show separately.
+                mapView.showAnnotations(clusterAnnotation.memberAnnotations, animated: true)
+            }
         }
     }
 }
