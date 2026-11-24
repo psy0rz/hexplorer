@@ -5,7 +5,7 @@ import SwiftUI
 final class OverlayColors {
     static let shared = OverlayColors()
 
-    var partial      = Color(red: 1, green: 1, blue: 1).opacity(1)
+    var partial      = Color(red: 0.8, green: 0.8, blue: 0.8).opacity(1)
     var partialWidth = 1.0
 
     var dense        = Color(red: 1, green: 1, blue: 0).opacity(1)
