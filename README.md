@@ -138,9 +138,7 @@ Other map elements:
 
 Flags are shown as `MKMarkerAnnotationView`s. MapKit draws the balloon; the app sets its colour,
 glyph and label. When flags overlap, they join into a cluster, and MapKit draws its default
-cluster marker. `FlagClusterAnnotationView` is a custom cluster view: a circle with the number of
-flags, in the colour of the flag with the highest priority. To use it, set
-`usesCustomFlagClusterView` to `true` in `FlagAnnotations.swift`.
+cluster marker. Tap a cluster to zoom in to its flags.
 
 The priority of a flag controls when it stays visible:
 

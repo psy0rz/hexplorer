@@ -1,9 +1,5 @@
 import MapKit
 
-/// When true, flag clusters are drawn by `FlagClusterAnnotationView`: a circle in the colour of
-/// the highest-priority flag. When false, MapKit draws its default cluster marker.
-private let usesCustomFlagClusterView = false
-
 // MARK: - Annotation model
 
 /// Custom annotation that carries the full MapFlag so the view can read color/priority.
@@ -61,82 +57,18 @@ final class FlagAnnotationView: MKMarkerAnnotationView {
     }
 }
 
-// MARK: - Cluster view
-
-///NOTE: disabled
-/// Shows the count of clustered flags as a circle in the colour of the highest-priority member.
-final class FlagClusterAnnotationView: MKAnnotationView {
-    static let reuseID = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
-
-    private static let circleDiameter: CGFloat = 40
-
-    override init(annotation: (any MKAnnotation)?, reuseIdentifier: String?) {
-        super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
-        displayPriority = .defaultHigh
-        collisionMode = .circle
-        frame = CGRect(x: 0, y: 0, width: Self.circleDiameter, height: Self.circleDiameter)
-    }
-
-    required init?(coder aDecoder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func prepareForDisplay() {
-        super.prepareForDisplay()
-        guard let cluster = annotation as? MKClusterAnnotation else { return }
-        let memberFlags = cluster.memberAnnotations.compactMap { ($0 as? FlagAnnotation)?.flag }
-
-        // The colour of the highest-priority member; gray when there are no flag members.
-        let highestPriorityFlag = memberFlags.first { $0.priority == .required }
-            ?? memberFlags.first { $0.priority == .high }
-            ?? memberFlags.first
-        let circleColor = highestPriorityFlag?.color.uiColor ?? .systemGray
-
-        image = drawCircle(color: circleColor, text: "\(cluster.memberAnnotations.count)")
-    }
-
-    private func drawCircle(color: UIColor, text: String) -> UIImage {
-        let diameter = Self.circleDiameter
-        let imageRenderer = UIGraphicsImageRenderer(size: CGSize(width: diameter, height: diameter))
-        return imageRenderer.image { drawingContext in
-            color.setFill()
-            drawingContext.cgContext.fillEllipse(in: CGRect(x: 0, y: 0, width: diameter, height: diameter))
-            let textAttributes: [NSAttributedString.Key: Any] = [
-                .foregroundColor: UIColor.white,
-                .font: UIFont.boldSystemFont(ofSize: diameter * 0.35)
-            ]
-            let textSize = (text as NSString).size(withAttributes: textAttributes)
-            let textRect = CGRect(
-                x: (diameter - textSize.width) / 2,
-                y: (diameter - textSize.height) / 2,
-                width: textSize.width,
-                height: textSize.height
-            )
-            (text as NSString).draw(in: textRect, withAttributes: textAttributes)
-        }
-    }
-}
-
 // MARK: - Map view helpers
 
 extension MKMapView {
     func registerFlagAnnotationViews() {
         register(FlagAnnotationView.self, forAnnotationViewWithReuseIdentifier: FlagAnnotationView.reuseID)
-        // Without this registration, the default cluster identifier gives MapKit's own cluster view.
-        if usesCustomFlagClusterView {
-            register(FlagClusterAnnotationView.self, forAnnotationViewWithReuseIdentifier: FlagClusterAnnotationView.reuseID)
-        }
     }
 
-    /// Returns the view for a flag or a flag cluster, or `nil` for other annotations.
+    /// Returns the view for a flag, or `nil` for other annotations. For a flag cluster, `nil`
+    /// makes MapKit draw its default cluster marker.
     func dequeueFlagAnnotationView(for annotation: any MKAnnotation) -> MKAnnotationView? {
-        if annotation is FlagAnnotation {
-            return dequeueReusableAnnotationView(withIdentifier: FlagAnnotationView.reuseID, for: annotation)
-        }
-        if annotation is MKClusterAnnotation {
-            return dequeueReusableAnnotationView(withIdentifier: FlagClusterAnnotationView.reuseID, for: annotation)
-        }
-        return nil
+        guard annotation is FlagAnnotation else { return nil }
+        return dequeueReusableAnnotationView(withIdentifier: FlagAnnotationView.reuseID, for: annotation)
     }
 
     /// True when a flag or a flag cluster is within 50 points of the point. The radius also
