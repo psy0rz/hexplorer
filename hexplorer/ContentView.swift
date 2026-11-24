@@ -224,7 +224,7 @@ struct ContentView: View {
             if let mapView {
                 VisitedHexagonOverlays.shared.reloadHexagons(on: mapView)
                 CellFlasher.shared.flash(cells: displayedCells(containing: tracker.lastFlushNewLeafCellIDs),
-                                         color: .systemYellow,
+                                         color: .purple,
                                          on: mapView)
             }
         }

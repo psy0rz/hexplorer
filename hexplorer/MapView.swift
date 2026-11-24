@@ -113,6 +113,18 @@ extension MapView {
             if mapView.selectedAnnotations.contains(where: { $0 is FlagAnnotation }) { return }
             let tappedCoordinate = mapView.convert(gesture.location(in: mapView), toCoordinateFrom: mapView)
             SelectedCellState.shared.toggleSelection(at: tappedCoordinate)
+            flashCellsVisitedAroundSelectedCell(on: mapView)
+        }
+
+        /// Flashes the selected cell with the 10 cells visited just before it and the 10 just after it, in visit order.
+        /// An unvisited cell has no visit time, so nothing flashes.
+        private func flashCellsVisitedAroundSelectedCell(on mapView: MKMapView) {
+            guard let selectedVisitedCell = SelectedCellState.shared.selectedCellInfo else { return }
+            let cellsInVisitOrder = CellStore.shared.cellsVisitedAround(selectedVisitedCell, count: 5)
+            CellFlasher.shared.flash(cells: cellsInVisitOrder.map { H3Cell($0.h3Index) },
+                                     color: .white,
+                                     on: mapView,
+                                     replacesQueuedFlashes: true)
         }
 
         /// A tap near a flag does not select a cell: MapKit handles it directly, with no delay.

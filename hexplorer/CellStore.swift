@@ -256,6 +256,43 @@ final class CellStore {
         }
     }
 
+    /// Returns the given cell, with at most `count` cells at the same resolution that were last visited
+    /// just before it and at most `count` that were last visited just after it. The list is in time order, oldest first.
+    /// Cells with the same `lastVisitedAt` are ordered by `h3Index`, so the order is always the same.
+    func cellsVisitedAround(_ centerCell: VisitedCell, count: Int) -> [VisitedCell] {
+        guard let resolution = try? H3Cell(centerCell.h3Index).resolution else { return [centerCell] }
+        let resolutionNumber = Int64(resolution.rawValue)
+        let centerH3Index = Int64(bitPattern: centerCell.h3Index)
+        do {
+            return try db.read { db in
+                let beforeSQL = """
+                    SELECT * FROM visitedCell
+                    WHERE (h3Index >> 52) & 0xF = ?
+                      AND (lastVisitedAt < ? OR (lastVisitedAt = ? AND h3Index < ?))
+                    ORDER BY lastVisitedAt DESC, h3Index DESC
+                    LIMIT ?
+                    """
+                let afterSQL = """
+                    SELECT * FROM visitedCell
+                    WHERE (h3Index >> 52) & 0xF = ?
+                      AND (lastVisitedAt > ? OR (lastVisitedAt = ? AND h3Index > ?))
+                    ORDER BY lastVisitedAt ASC, h3Index ASC
+                    LIMIT ?
+                    """
+                let arguments: StatementArguments = [
+                    resolutionNumber, centerCell.lastVisitedAt, centerCell.lastVisitedAt, centerH3Index, count,
+                ]
+                // The before query gives the nearest cell first, so reverse it into time order.
+                let cellsBefore = try VisitedCell.fetchAll(db, sql: beforeSQL, arguments: arguments).reversed()
+                let cellsAfter = try VisitedCell.fetchAll(db, sql: afterSQL, arguments: arguments)
+                return cellsBefore + [centerCell] + cellsAfter
+            }
+        } catch {
+            print("CellStore query error: \(error)")
+            return [centerCell]
+        }
+    }
+
     // MARK: - Private
 
     /// Records one visit and returns how many rows of the parent chain it inserted and updated.
