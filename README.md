@@ -129,13 +129,20 @@ Other map elements:
 - `HexagonHighlightView` draws the selected cell with a yellow glow and a crosshair.
 - `NewCellFlashes` flashes the new cells after each database write.
 - `MapView` adds a layers button and a follow button. The follow button keeps the user location
-  in the center of the map without a change of zoom. The app stores the map position and zoom,
-  and restores them at the next launch.
+  in the center of the map without a change of zoom (`UserLocationFollower`). The follow move sets
+  the map center on each frame, without an animation, so you can always pan and zoom by hand.
+  A pan with one finger turns follow mode off. The app stores the map position and zoom, and
+  restores them at the next launch.
 
 ### Flags
 
-Flags are shown as clustered `MKMarkerAnnotationView`s. The priority of a flag controls when it
-stays visible:
+Flags are shown as `MKMarkerAnnotationView`s. MapKit draws the balloon; the app sets its colour,
+glyph and label. When flags overlap, they join into a cluster, and MapKit draws its default
+cluster marker. `FlagClusterAnnotationView` is a custom cluster view: a circle with the number of
+flags, in the colour of the flag with the highest priority. To use it, set
+`usesCustomFlagClusterView` to `true` in `FlagAnnotations.swift`.
+
+The priority of a flag controls when it stays visible:
 
 | Priority | Behaviour |
 |---|---|
@@ -160,7 +167,11 @@ location in Google Maps, Street View, OpenStreetMap and Apple Maps.
 |---|---|
 | `hexplorerApp.swift` | App entry point. Starts tracking again if it was on. |
 | `ContentView.swift` | Root view: map, buttons, bottom panels, export and import |
-| `MapView.swift` | MapKit wrapper: map controls, follow mode, tap handling, flag annotations |
+| `MapView.swift` | MapKit wrapper and map delegate. It passes each job to the files below. |
+| `UserLocationFollower.swift` | Follow mode: the follow button, the smooth follow move, and the touch recognizers |
+| `MapControlsView.swift` | Liquid Glass capsule with the layers button and the follow button |
+| `StoredMapViewport.swift` | Map position, zoom and follow mode of the last session |
+| `FlagAnnotations.swift` | Flag markers, flag clusters, and the sync between `FlagStore` and the map |
 | `VisitedHexagonOverlays.swift` | Resolution selection, density classification and hexagon overlays |
 | `HexagonHighlightView.swift` | Highlight of the selected cell |
 | `NewCellFlashes.swift` | Flash of newly visited cells |

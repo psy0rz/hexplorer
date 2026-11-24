@@ -32,6 +32,21 @@ final class SelectedCellState {
 
     private init() {}
 
+    /// Selects the cell at the coordinate, at the resolution of the current zoom.
+    /// When that cell is already selected, it clears the selection.
+    func toggleSelection(at coordinate: CLLocationCoordinate2D) {
+        guard let resolution = H3Cell.Resolution(rawValue: Int32(currentZoomResolution)) else { return }
+        let latLng = H3LatLng(latitudeDegs: coordinate.latitude, longitudeDegs: coordinate.longitude)
+        guard let tappedCell = try? latLng.cell(at: resolution) else { return }
+
+        if selectedCellIndex == tappedCell.id {
+            clear()
+        } else {
+            let info = CellStore.shared.visitedCells(among: [tappedCell.id])[tappedCell.id]
+            select(cell: tappedCell, info: info, coordinate: coordinate)
+        }
+    }
+
     func select(cell: H3Cell, info: VisitedCell?, coordinate: CLLocationCoordinate2D) {
         tappedCoordinate = coordinate
         // Snap the display resolution to the current zoom level on each new tap.

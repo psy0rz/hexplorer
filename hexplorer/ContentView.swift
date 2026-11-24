@@ -10,11 +10,6 @@ private enum ActivePanel: Equatable {
 }
 
 struct ContentView: View {
-//    private static let initialRegion = MKCoordinateRegion(
-//        center: CLLocationCoordinate2D(latitude: 52.7, longitude: 6.8),
-//        span: MKCoordinateSpan(latitudeDelta: 1, longitudeDelta: 1)
-//    )
-
     @State private var mapView: MKMapView?
     @State private var showImportPicker = false
     @State private var showExportPicker = false
@@ -33,26 +28,20 @@ struct ContentView: View {
     private var filterState = FilterState.shared
     private var mapLayerSettings = MapLayerSettings.shared
 
-//    private var currentH3Resolution: Int {
-//        let lat = mapView?.centerCoordinate.latitude ?? Self.initialRegion.center.latitude
-//        return Int(h3Resolution(for: MKZoomScale(zoomScale), latitude: lat).rawValue)
-//    }
-
     var body: some View {
         ZStack {
             MapView(
-//                region: Self.initialRegion,
-                onMapViewCreated: { mv in
-                    self.mapView = mv
-                    syncFlagAnnotations(on: mv)
-                    mv.delegate.flatMap { $0 as? MapView.Coordinator }?.onFlagEdit = { flag in
-                        activePanel = .flagEditor(flag)
-                        // Deselect cell so only the flag panel shows.
-                        selectedCell.clear()
-                    }
+                onMapViewCreated: { createdMapView in
+                    self.mapView = createdMapView
+                    createdMapView.syncFlagAnnotations()
                 },
                 onMapLayersButtonTap: {
                     activePanel = activePanel == .mapLayers ? nil : .mapLayers
+                },
+                onFlagTap: { tappedFlag in
+                    activePanel = .flagEditor(tappedFlag)
+                    // Deselect cell so only the flag panel shows.
+                    selectedCell.clear()
                 }
             )
             .edgesIgnoringSafeArea(.all)
@@ -145,7 +134,7 @@ struct ContentView: View {
                     CellInfoPanel(
                         state: selectedCell,
                         onDelete: {
-                            if let mapView { refreshHexagonOverlay(on: mapView) }
+                            if let mapView { VisitedHexagonOverlays.shared.reloadHexagons(on: mapView) }
                         },
                         onAddFlag: {
                             activePanel = .flagEditor(nil)
@@ -157,9 +146,9 @@ struct ContentView: View {
                         coordinate: selectedCell.tappedCoordinate,
                         onSave: { id in
                             if let id {
-                                if let mapView { refreshFlagAnnotation(id: id, on: mapView) }
+                                if let mapView { mapView.refreshFlagAnnotation(id: id) }
                             } else {
-                                if let mapView { syncFlagAnnotations(on: mapView) }
+                                if let mapView { mapView.syncFlagAnnotations() }
                             }
                             activePanel = nil
                         },
@@ -167,7 +156,7 @@ struct ContentView: View {
                             activePanel = nil
                         },
                         onDelete: {
-                            if let mapView { syncFlagAnnotations(on: mapView) }
+                            if let mapView { mapView.syncFlagAnnotations() }
                             activePanel = nil
                         }
                     )
@@ -233,7 +222,7 @@ struct ContentView: View {
             // When the app is not active, nobody sees the map. The reload on activation shows the new cells.
             guard scenePhase == .active else { return }
             if let mapView {
-                refreshHexagonOverlay(on: mapView)
+                VisitedHexagonOverlays.shared.reloadHexagons(on: mapView)
                 NewCellFlashes.shared.flash(newLeafCellIDs: tracker.lastFlushNewLeafCellIDs, on: mapView)
             }
         }
@@ -241,13 +230,13 @@ struct ContentView: View {
             let isAppActive = newScenePhase == .active
             tracker.isAppActive = isAppActive
             // Setting isAppActive flushes the buffer, so the reload includes all visits.
-            if isAppActive, let mapView { refreshHexagonOverlay(on: mapView) }
+            if isAppActive, let mapView { VisitedHexagonOverlays.shared.reloadHexagons(on: mapView) }
         }
         .onChange(of: mapLayerSettings.mapStyle)             { applyMapLayerSettings() }
         .onChange(of: mapLayerSettings.showsSatelliteLabels)  { applyMapLayerSettings() }
         .onChange(of: mapLayerSettings.showsPointsOfInterest) { applyMapLayerSettings() }
-        .onChange(of: filterState.mode)                  { if let mapView { refreshHexagonOverlay(on: mapView) } }
-        .onChange(of: filterState.thresholdStopIndices)   { if let mapView { refreshHexagonOverlay(on: mapView) } }
+        .onChange(of: filterState.mode)                  { if let mapView { VisitedHexagonOverlays.shared.reloadHexagons(on: mapView) } }
+        .onChange(of: filterState.thresholdStopIndices)   { if let mapView { VisitedHexagonOverlays.shared.reloadHexagons(on: mapView) } }
         .fileExporter(
             isPresented: $showExportPicker,
             document: exportDocument,
@@ -299,8 +288,8 @@ struct ContentView: View {
             try CellStore.shared.importDatabase(from: url)
             FlagStore.shared.load()
             if let mapView {
-                refreshHexagonOverlay(on: mapView)
-                syncFlagAnnotations(on: mapView)
+                VisitedHexagonOverlays.shared.reloadHexagons(on: mapView)
+                mapView.syncFlagAnnotations()
             }
         } catch {
             print("Failed to import database: \(error)")
@@ -317,7 +306,7 @@ struct ContentView: View {
                 latDelta: region.span.latitudeDelta,
                 lngDelta: region.span.longitudeDelta
             )
-            refreshHexagonOverlay(on: mapView)
+            VisitedHexagonOverlays.shared.reloadHexagons(on: mapView)
         } catch {
             print("Failed to generate test visits: \(error)")
         }
@@ -339,7 +328,7 @@ struct ContentView: View {
                 priority: priorities.randomElement()!
             )
         }
-        syncFlagAnnotations(on: mapView)
+        mapView.syncFlagAnnotations()
     }
 
 
