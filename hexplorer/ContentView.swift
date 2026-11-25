@@ -233,7 +233,7 @@ struct ContentView: View {
             updateRepeatedFlashing()
         }
         .onChange(of: mapView)                             { updateRepeatedFlashing() }
-        .onChange(of: selectedCell.selectedCellIndex)      { updateRepeatedFlashing() }
+        .onChange(of: selectedCell.selectedCellIndex)      { updateRepeatedFlashing(restartsForNewSelection: true) }
         .onChange(of: selectedCell.currentZoomResolution)  { updateRepeatedFlashing() }
         .onChange(of: mapLayerSettings.mapStyle)             { applyMapLayerSettings() }
         .onChange(of: mapLayerSettings.showsSatelliteLabels)  { applyMapLayerSettings() }
@@ -262,7 +262,9 @@ struct ContentView: View {
     ///   An unvisited cell has no visit time, so nothing flashes.
     /// - without a selected cell: the trail of the 5 cells visited last, at the resolution the map shows now, in blue.
     /// The flasher ignores a pattern that did not change, so this can run at each change of the data.
-    private func updateRepeatedFlashing() {
+    /// When `restartsForNewSelection` is true and a cell is selected, the pattern of that cell starts at once,
+    /// so a tap on a cell shows its pattern directly. In all other cases, the new pattern waits for the current run.
+    private func updateRepeatedFlashing(restartsForNewSelection: Bool = false) {
         // When the app is not active, nobody sees the map.
         guard scenePhase == .active else {
             CellFlasher.shared.stopRepeatedFlashing()
@@ -273,7 +275,8 @@ struct ContentView: View {
                 CellStore.shared.cellsVisitedAround($0, count: 5)
             } ?? []
             CellFlasher.shared.repeatFlashing(cells: cellsInVisitOrder.map { H3Cell($0.h3Index) },
-                                              color: .white)
+                                              color: .white,
+                                              restartsCurrentRun: restartsForNewSelection)
         } else {
             let trailCellsInVisitOrder = CellStore.shared.cellsVisitedLast(
                 atResolution: selectedCell.currentZoomResolution, count: 5)

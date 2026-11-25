@@ -40,13 +40,20 @@ final class CellFlasher {
     /// Flashes the cells in order, and starts again after each run. A run that has started always ends first:
     /// other cells start after the current run. A call with the same cells and color changes nothing,
     /// so callers can send the cells at each change of the data. An empty list stops the loop after the current run.
-    func repeatFlashing(cells: [H3Cell], color: UIColor) {
+    /// When `restartsCurrentRun` is true, the current run stops at once and the new cells start directly;
+    /// the flashes that already fade continue.
+    func repeatFlashing(cells: [H3Cell], color: UIColor, restartsCurrentRun: Bool = false) {
         repeatedFlashCells = cells
         repeatedFlashColor = color
+        if restartsCurrentRun {
+            repeatedFlashTask?.cancel()
+            repeatedFlashTask = nil
+        }
         guard repeatedFlashTask == nil, !cells.isEmpty else { return }
         repeatedFlashTask = Task {
             await runRepeatedFlashLoop()
-            repeatedFlashTask = nil
+            // A cancelled task is already replaced by a restart.
+            if !Task.isCancelled { repeatedFlashTask = nil }
         }
     }
 
@@ -68,11 +75,12 @@ final class CellFlasher {
     /// Starts one flash per cell, with `flashStartInterval` between the starts, waits until the last fade has ended
     /// and the pause has passed, and starts again with the pattern of that time.
     private func runRepeatedFlashLoop() async {
-        while !repeatedFlashCells.isEmpty, mapView != nil {
+        while !Task.isCancelled, !repeatedFlashCells.isEmpty, mapView != nil {
             let runColor = repeatedFlashColor
             for cell in repeatedFlashCells {
                 Task { await showFlash(of: cell, color: runColor) }
                 try? await Task.sleep(for: Self.flashStartInterval)
+                if Task.isCancelled { return }
             }
             try? await Task.sleep(for: Self.repeatPause)
         }
