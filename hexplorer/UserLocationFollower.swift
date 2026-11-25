@@ -1,5 +1,4 @@
 import MapKit
-import SwiftyH3
 import UIKit.UIGestureRecognizerSubclass
 
 /// Keeps the user location in the center of the map, without a change of zoom, while follow mode
@@ -72,18 +71,6 @@ final class UserLocationFollower: NSObject, UIGestureRecognizerDelegate {
         if followsUserLocation, let mapView, let userCoordinate = mapView.userLocation.location?.coordinate {
             centerMap(mapView, on: userCoordinate)
         }
-        if followsUserLocation, let mapView { flashCellsVisitedLast(on: mapView) }
-    }
-
-    /// Flashes the 10 cells visited last, at the resolution the map shows now, in visit order:
-    /// it shows the trail that the user walked just before.
-    private func flashCellsVisitedLast(on mapView: MKMapView) {
-        let cellsInVisitOrder = CellStore.shared.cellsVisitedLast(
-            atResolution: SelectedCellState.shared.currentZoomResolution, count: 10)
-        CellFlasher.shared.flash(cells: cellsInVisitOrder.map { H3Cell($0.h3Index) },
-                                 color: .systemBlue,
-                                 on: mapView,
-                                 replacesQueuedFlashes: true)
     }
 
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
