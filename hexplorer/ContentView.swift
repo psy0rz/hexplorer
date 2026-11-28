@@ -9,9 +9,24 @@ private enum ActivePanel: Equatable {
     case mapLayers
 }
 
+/// The kind of file that the file importer opens.
+private enum FileImportKind {
+    case database
+    case googleTimeline
+
+    var allowedContentTypes: [UTType] {
+        switch self {
+        case .database: [UTType.database, .data]
+        case .googleTimeline: [.json]
+        }
+    }
+}
+
 struct ContentView: View {
     @State private var mapView: MKMapView?
     @State private var showImportPicker = false
+    @State private var fileImportKind: FileImportKind = .database
+    @State private var googleTimelineImportMessage: String?
     @State private var showExportPicker = false
     @State private var exportDocument: DatabaseDocument?
     @State private var showGenerateConfirmation = false
@@ -27,6 +42,7 @@ struct ContentView: View {
     private var selectedCell = SelectedCellState.shared
     private var filterState = FilterState.shared
     private var mapLayerSettings = MapLayerSettings.shared
+    private var googleTimelineImporter = GoogleTimelineImporter.shared
 
     var body: some View {
         ZStack {
@@ -90,9 +106,19 @@ struct ContentView: View {
                             Button(action: exportDatabase) {
                                 Label("Export Database", systemImage: "square.and.arrow.up")
                             }
-                            Button(action: { showImportPicker = true }) {
+                            Button(action: {
+                                fileImportKind = .database
+                                showImportPicker = true
+                            }) {
                                 Label("Import Database", systemImage: "square.and.arrow.down")
                             }
+                            Button(action: {
+                                fileImportKind = .googleTimeline
+                                showImportPicker = true
+                            }) {
+                                Label("Import Google Timeline", systemImage: "clock.arrow.circlepath")
+                            }
+                            .disabled(googleTimelineImporter.isImporting)
 //                            Button(action: { showGenerateConfirmation = true }) {
 //                                Label("Generate Test Visits", systemImage: "dice")
 //                            }
@@ -194,6 +220,27 @@ struct ContentView: View {
                 .allowsHitTesting(false)
             }
 
+            // While a Google Timeline import runs, a pill at the top with the progress.
+            if googleTimelineImporter.isImporting {
+                HStack(spacing: 8) {
+                    ProgressView()
+                    if googleTimelineImporter.totalLocationCount == 0 {
+                        Text("Reading Google Timeline…")
+                    } else {
+                        Text("Importing \(googleTimelineImporter.recordedLocationCount) of \(googleTimelineImporter.totalLocationCount) locations")
+                            .contentTransition(.numericText())
+                    }
+                }
+                .font(.footnote.weight(.semibold))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .glassEffect(.regular, in: .capsule)
+                .frame(maxHeight: .infinity, alignment: .top)
+                .padding(.top, 8)
+                .transition(.opacity)
+                .allowsHitTesting(false)
+            }
+
             // A short message at the top after the user turns tracking on or off.
             if trackingToastIsShown {
                 Label(tracker.isTracking ? "Tracking On" : "Tracking Off",
@@ -253,7 +300,21 @@ struct ContentView: View {
             allowedContentTypes: [UTType.database, .data],
             allowsMultipleSelection: false
         ) { result in
-            importDatabase(result: result)
+            switch fileImportKind {
+            case .database: importDatabase(result: result)
+            case .googleTimeline: importGoogleTimeline(result: result)
+            }
+        }
+        .alert(
+            "Google Timeline Import",
+            isPresented: Binding(
+                get: { googleTimelineImportMessage != nil },
+                set: { isPresented in if !isPresented { googleTimelineImportMessage = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(googleTimelineImportMessage ?? "")
         }
     }
 
@@ -324,6 +385,23 @@ struct ContentView: View {
             }
         } catch {
             print("Failed to import database: \(error)")
+        }
+    }
+
+    private func importGoogleTimeline(result: Result<[URL], Error>) {
+        guard let url = try? result.get().first else { return }
+        Task {
+            guard url.startAccessingSecurityScopedResource() else { return }
+            defer { url.stopAccessingSecurityScopedResource() }
+            do {
+                let newLeafCellCount = try await googleTimelineImporter.importTimeline(from: url)
+                googleTimelineImportMessage = "Imported \(googleTimelineImporter.totalLocationCount) locations with \(newLeafCellCount) new cells."
+            } catch {
+                print("Failed to import Google Timeline: \(error)")
+                googleTimelineImportMessage = "The import failed: \(error.localizedDescription)"
+            }
+            if let mapView { VisitedHexagonOverlays.shared.reloadHexagons(on: mapView) }
+            updateRepeatedFlashing()
         }
     }
 

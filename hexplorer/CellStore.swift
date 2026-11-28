@@ -17,10 +17,10 @@ struct VisitedCell: Codable, FetchableRecord, PersistableRecord {
 final class CellStore {
     static let shared = CellStore()
 
-    private static let leafResolution = H3Cell.Resolution(rawValue: Int32(maxResolution))!
-    static let maxResolution = 13
+    nonisolated private static let leafResolution = H3Cell.Resolution(rawValue: Int32(maxResolution))!
+    nonisolated static let maxResolution = 13
 
-    private(set) var db: DatabasePool
+    nonisolated let db: DatabasePool
 
     let databaseURL: URL = FileManager.default
         .urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -62,14 +62,12 @@ final class CellStore {
 
     // MARK: - Public API
 
-    func recordVisit(latitude: Double, longitude: Double) throws {
-        try recordVisits(locations: [(latitude: latitude, longitude: longitude, visitedAt: Date())])
-    }
 
     /// Records the visits and returns the res-13 leaf cells that were not visited before.
     /// `visitedAt` is the time of the GPS fix, not the time of the write.
+    /// Nonisolated, so a large import can run off the main thread.
     @discardableResult
-    func recordVisits(locations: [(latitude: Double, longitude: Double, visitedAt: Date)]) throws -> [UInt64] {
+    nonisolated func recordVisits(locations: [(latitude: Double, longitude: Double, visitedAt: Date)]) throws -> [UInt64] {
         let recordStartTime = ContinuousClock.now
         var newLeafCellIDs: [UInt64] = []
         var insertedRowCount = 0
@@ -315,7 +313,7 @@ final class CellStore {
     // MARK: - Private
 
     /// Records one visit and returns how many rows of the parent chain it inserted and updated.
-    private static func recordVisit(
+    nonisolated private static func recordVisit(
         in db: Database,
         latLng: H3LatLng,
         visitedAt: Date,
@@ -344,23 +342,42 @@ final class CellStore {
         var leafIsNew = false
         var childIsNew = false
 
+        // The chain goes from the leaf up to res 0, so each cell is the parent of the cell before it.
         for current in chain {
             let isLeaf = current == leafCell
             if var existing = existingMap[current.id] {
+                // The cell is known: update its row.
+
+                // An import can give visits that are older than the stored visits,
+                // so the visit can be before the first visit or after the last visit.
+                let isBeforeFirstVisit = visitedAt < existing.firstVisitedAt
+                // A visit counts as a new visit only when it is more than 5 minutes
+                // after the last visit or more than 5 minutes before the first visit.
                 let countVisit = visitedAt.timeIntervalSince(existing.lastVisitedAt) > 300
-                if !countVisit && !childIsNew && !leafIsNew { return (insertedRowCount, updatedRowCount) }
+                    || existing.firstVisitedAt.timeIntervalSince(visitedAt) > 300
+                // Nothing changes for this cell, so nothing changes for its parents:
+                // a parent covers the visit times of its child. Stop here to save the writes.
+                if !countVisit && !isBeforeFirstVisit && !childIsNew && !leafIsNew { return (insertedRowCount, updatedRowCount) }
                 if countVisit { existing.visitCount += 1 }
-                existing.lastVisitedAt = visitedAt
+                existing.firstVisitedAt = min(existing.firstVisitedAt, visitedAt)
+                existing.lastVisitedAt = max(existing.lastVisitedAt, visitedAt)
                 if isLeaf {
+                    // A leaf has no children in the database. It counts as fully visited:
+                    // 7 is the number of children of an H3 cell.
                     existing.visitedChildren = 7
                 } else if childIsNew {
+                    // The child below was inserted just now, so this cell has one more visited child.
                     existing.visitedChildren += 1
                 }
+                // A new leaf is one more visited leaf for each ancestor.
                 if leafIsNew { existing.visitedLeaves += 1 }
                 try existing.update(db)
                 updatedRowCount += 1
+                // This cell was known, so for its parent it is not a new child.
                 childIsNew = false
             } else {
+                // The cell is not known: insert a row. The first row inserted is the leaf,
+                // and each parent above a new cell gets one visited child.
                 try VisitedCell(
                     h3Index: current.id,
                     firstVisitedAt: visitedAt,
@@ -370,7 +387,9 @@ final class CellStore {
                     visitedLeaves: leafIsNew ? 1 : 0
                 ).insert(db)
                 insertedRowCount += 1
+                // This cell is new, so its parent has one more visited child.
                 childIsNew = true
+                // Only the leaf makes leafIsNew true, so each ancestor adds 1 to visitedLeaves.
                 if isLeaf { leafIsNew = true }
             }
         }
