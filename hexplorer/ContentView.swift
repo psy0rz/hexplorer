@@ -275,6 +275,9 @@ struct ContentView: View {
         .onChange(of: scenePhase, initial: true) { _, newScenePhase in
             let isAppActive = newScenePhase == .active
             tracker.isAppActive = isAppActive
+            // The app has the location background mode, so the map would keep the GPS on for the
+            // blue dot in the background. When tracking is on, LocationTracker keeps its own updates.
+            mapView?.showsUserLocation = newScenePhase != .background
             // Setting isAppActive flushes the buffer, so the reload includes all visits.
             if isAppActive, let mapView { VisitedHexagonOverlays.shared.reloadHexagons(on: mapView) }
             updateRepeatedFlashing()
